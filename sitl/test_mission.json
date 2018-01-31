@@ -1,0 +1,27 @@
+[
+
+    {
+        "latitude" : 33.7777777,
+        "longitude": -117.12351241,
+        "altitude" : 30,
+        "type": "takeoff"
+    },
+    {
+        "latitude" : 33.999999,
+        "longitude": -117.12351241,
+        "altitude" : 30,
+        "type": "nav"
+    },
+    {
+        "latitude" : 34.0,
+        "longitude": -117.12351241,
+        "altitude" : 30,
+        "type": "nav"
+    },
+    {
+        "latitude" : 34.22222222,
+        "longitude": -117.12351241,
+        "altitude" : 30,
+        "type": "landing"
+    }
+]
