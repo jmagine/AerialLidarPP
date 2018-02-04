@@ -19,6 +19,9 @@ folder_recursion = "RECURSION"
 
 outfile = data + 'USGS.tif'
 
+# Filter points that are only classified as:
+class_codes = [2] # Ground
+
 # Raster Parameters:
 gentype = 'ELEVATION' # ELEVATION, INTENSITY, RGB
 
@@ -53,7 +56,10 @@ try:
     # ends anyways so don't have to worry too much about files appearing)
     #        las_layer = arc.CreateUniqueName('tmp.layer')
     las_layer = 'tmp.layer'
-    arc.management.MakeLasDatasetLayer(las_dataset, las_layer)
+    arc.management.MakeLasDatasetLayer( las_dataset
+                                      , las_layer
+                                      , class_code=class_codes
+                                      )
 
     # API Ref: http://resources.arcgis.com/en/help/main/10.1/index.html#//001200000052000000
     arc.conversion.LasDatasetToRaster( in_las_dataset=las_layer
