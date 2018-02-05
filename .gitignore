@@ -1,4 +1,4 @@
 LaserVision-venv
-LaserVision-venv
-LaserVision-venv
-LaserVision-venv
+mav.*
+*.pyc
+__pycache__
