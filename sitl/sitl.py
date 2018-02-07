@@ -4,14 +4,19 @@ import sys
 import json
 import time
 
+time.sleep(10)
+
 if len(sys.argv) != 3:
     print("Requires arguments for port number and mission file")
+    sys.exit()
 
 print("Connecting on port {0}".format(sys.argv[1]))
 connection_string = "127.0.0.1:{0}".format(sys.argv[1])
 print(connection_string)
 
 vehicle = connect(connection_string, wait_ready=True)
+
+vehicle.parameters['ARMING_CHECK'] = 0
 
 cmds = vehicle.commands
 
@@ -67,7 +72,7 @@ def arm_and_takeoff(aTargetAltitude):
             break
         time.sleep(1)
 
-arm_and_takeoff(50)
+arm_and_takeoff(30)
 
 vehicle.commands.next=0
 

@@ -2,12 +2,15 @@
 from rasterio.features import shapes
 from shapely.geometry import shape, LineString, Polygon
 from shapely.strtree import STRtree
+from shapely.ops import transform
 import pyproj
 
 import geopandas as gp
 import rasterio
 import json
 import math
+
+import time
 
 import sys
 
@@ -83,26 +86,37 @@ def get_vector_from_raster(rasterfile):
             in enumerate(
                 shapes(image, mask=None, transform=src.affine)))
 
-    return results
+    return list(results)
+
 
 def get_shapes_from_vector(vectors):
     alt_dict = {}
     shapes = []
 
-    proj = utm_proj(vectors[0].coords[0][0], vectors[0].coords[0][1])
+    first_tup = vectors[0]['geometry']['coordinates'][0][0]
 
+    print(first_tup)
+
+
+    proj = utm_proj(first_tup[1], first_tup[0])
+
+    def transform_to_proj(x, y, z=None):
+        return pyproj.transform(wgs84, proj, x, y, z)
+
+    init_time = time.time()
     for vec in vectors:
-        shap = shape(vec['geometry'])
-        shap = Polygon(list(map(lambda x: pyproj.transform(wgs84, proj, x[0], x[1], 0), shap.coords)))
+        shap = transform(transform_to_proj, shape(vec['geometry']))
         alt_dict[shap.wkt] = vec['properties']['raster_val']
         shapes.append(shap)
+
+    print("transforming the vectors took {0} seconds".format(time.time() - init_time))
 
     return shapes, alt_dict, proj
 
 
 
 def distance(p1, p2):
-    return ((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2 + (p1[2] - p2[2])**2)**.5
+    return sum(map(lambda s: (s[0] - s[1])**2, zip(p1, p2)))**.5
 
 
 # Args:
@@ -115,30 +129,40 @@ def plan_path(path, strtree, alt_dict, buffer):
     for i in range(1, len(path)):
         segments.append((path[i-1], path[i]))
 
+    print("Built Segments")
+    print("segments", segments)
+
     new_path  = []
     new_path.append((path[0][0], path[0][1], 0))
 
     for seg in segments:
-        ls = LineString(seg)
-        intersecting = list(strtree.query(ls.buffer(buffer)))
+        init_time = time.time()
+        print("Started Segment")
+        ls = LineString(seg).buffer(buffer)
+        intersecting = list(strtree.query(ls))
 
+        print(type(intersecting))
+        print("R Tree query returns {0} intersections".format(len(intersecting)))
         for inter in intersecting:
-            g_coll = ls.intersection(inter)
-            g_coll = list(sorted(g_coll, lambda x: distance(p1, x.coords[0])))
+            #TODO determine if the order of the method calling intersection matters
+            g_coll = list(inter.intersection(ls))
+            print("Intersection query returns {0} intersections".format(len(g_coll)))
+            g_coll = list(sorted(g_coll, key=lambda x: distance(p1, x.coords[0])))
 
-            for int_line in g_coll:
-                alt = alt_dict[int_line.wkt]
-                coord = int_line.coords[0]
+            for coord in g_coll:
+                alt = alt_dict[g_coll.wkt]
                 new_path.append((coord[0], coord[1], alt + buffer))
 
+        print("Finished Segment in {0}".format(time.time() - init_time))
     return new_path
 
-def read_init_path(filepath):
+def read_init_path(filepath, proj):
     miss_dict = json.load(open(filepath))
 
     tups = []
     for wp in miss_dict:
-        tups.append((miss_dict['latitude'], miss_dict['longitude'], miss_dict['altitude']))
+        x, y, z = pyproj.transform(wgs84, proj, wp['longitude'], wp['latitude'],0)
+        tups.append((x, y, z))
 
     return tups
 
@@ -147,10 +171,10 @@ def save_path(filepath, path, proj):
     arr = []
     for x, y, z in path:
         lon, lat, alt = pyproj.transform(proj, wgs84, x, y, z)
-        new_dict = {'latitude' : latitude, 'longitude' : lon, 'altitude' : z}
+        new_dict = {'latitude' : lat, 'longitude' : lon, 'altitude' : alt}
         arr.append(new_dict)
 
-    json.dump(arr, open(filepath))
+    json.dump(arr, open(filepath, 'w'))
 
 
 
@@ -162,12 +186,15 @@ if __name__ == '__main__':
         sys.exit()
 
 
-    miss_waypoints = read_init_path(sys.argv[2])
 
     vectors = get_vector_from_raster(sys.argv[1])
 
     shapes, alt_dict, proj = get_shapes_from_vector(vectors)
 
-    new_path = plan_path(miss_waypoints, shapes, alt_dict, float(sys.argv[3]))
+    miss_waypoints = read_init_path(sys.argv[2], proj)
+
+    tree = STRtree(shapes)
+
+    new_path = plan_path(miss_waypoints, tree, alt_dict, float(sys.argv[3]))
 
     save_path('path.json', new_path, proj)

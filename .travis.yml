@@ -4,8 +4,7 @@ sudo: true
 
 install:
 - sudo apt-get install python-dev python-opencv python-wxgtk3.0 python-pip python-matplotlib python-pygame python-lxml
-  sudo pip install MAVProxy
-- echo "export PATH=$PATH:$HOME/.local/bin" >> ~/.bashrc
+- sudo python -m pip -r requirements.txt
 
 script:
     - make runsitl
