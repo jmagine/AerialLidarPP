@@ -7,6 +7,7 @@ import pyproj
 import geopandas as gp
 import rasterio
 import json
+import math
 
 import sys
 
@@ -162,7 +163,7 @@ if __name__ == '__main__':
 
 
     miss_waypoints = read_init_path(sys.argv[2])
-    
+
     vectors = get_vector_from_raster(sys.argv[1])
 
     shapes, alt_dict, proj = get_shapes_from_vector(vectors)
