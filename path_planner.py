@@ -1,12 +1,10 @@
 #TODO Add pyproj to convert to meter grid
 from rasterio.features import shapes
-from shapely.geometry import shape, LineString, Polygon
-from shapely.strtree import STRtree
-from shapely.ops import transform
-import pyproj
-
-import geopandas as gp
 import rasterio
+import pyproj
+from shapely.ops import transform
+from shapely.geometry import shape, LineString, Polygon, MultiPolygon
+
 import json
 import math
 
@@ -136,22 +134,22 @@ def plan_path(path, strtree, alt_dict, buffer):
     new_path.append((path[0][0], path[0][1], 0))
 
     for seg in segments:
+        seg_points = []
         init_time = time.time()
         print("Started Segment")
         ls = LineString(seg).buffer(buffer)
-        intersecting = list(strtree.query(ls))
+        intersecting = list(strtree.intersection(ls))
 
-        print(type(intersecting))
         print("R Tree query returns {0} intersections".format(len(intersecting)))
         for inter in intersecting:
-            #TODO determine if the order of the method calling intersection matters
-            g_coll = list(inter.intersection(ls))
-            print("Intersection query returns {0} intersections".format(len(g_coll)))
-            g_coll = list(sorted(g_coll, key=lambda x: distance(p1, x.coords[0])))
 
             for coord in g_coll:
                 alt = alt_dict[g_coll.wkt]
-                new_path.append((coord[0], coord[1], alt + buffer))
+                seg_points.append((coord[0], coord[1], alt + buffer))
+
+        seg_points = list(sorted(seg_points, key=lambda x: distance(p1, x.coords[0])))
+
+        new_path += seg_points
 
         print("Finished Segment in {0}".format(time.time() - init_time))
     return new_path
@@ -193,7 +191,7 @@ if __name__ == '__main__':
 
     miss_waypoints = read_init_path(sys.argv[2], proj)
 
-    tree = STRtree(shapes)
+    tree = MultiPolygon(shapes)
 
     new_path = plan_path(miss_waypoints, tree, alt_dict, float(sys.argv[3]))
 
