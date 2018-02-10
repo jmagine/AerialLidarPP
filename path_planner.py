@@ -1,9 +1,9 @@
-#TODO Add pyproj to convert to meter grid
 from rasterio.features import shapes
 import rasterio
 import pyproj
 from shapely.ops import transform
 from shapely.geometry import shape, LineString, Polygon, MultiPolygon
+from shapely.strtree import STRtree
 
 import json
 import math
@@ -137,17 +137,22 @@ def plan_path(path, strtree, alt_dict, buffer):
         seg_points = []
         init_time = time.time()
         print("Started Segment")
-        ls = LineString(seg).buffer(buffer)
-        intersecting = list(strtree.intersection(ls))
+        ls = LineString(seg)
+        intersecting = list(strtree.query(ls))
 
         print("R Tree query returns {0} intersections".format(len(intersecting)))
         for inter in intersecting:
 
-            for coord in g_coll:
-                alt = alt_dict[g_coll.wkt]
-                seg_points.append((coord[0], coord[1], alt + buffer))
+            intersection = inter.intersection(ls)
+            print("wkt", intersection.wkt)
+            print("type", type(intersection))
+  
+            if 'line' in intersection.wkt.lower():
+                for coord in intersection.coords:
+                    alt = alt_dict[inter.wkt]
+                    seg_points.append((coord[0], coord[1], alt + buffer))
 
-        seg_points = list(sorted(seg_points, key=lambda x: distance(p1, x.coords[0])))
+        seg_points = list(sorted(seg_points, key=lambda x: distance(seg[0], x)))
 
         new_path += seg_points
 
@@ -191,7 +196,7 @@ if __name__ == '__main__':
 
     miss_waypoints = read_init_path(sys.argv[2], proj)
 
-    tree = MultiPolygon(shapes)
+    tree = STRtree(shapes)
 
     new_path = plan_path(miss_waypoints, tree, alt_dict, float(sys.argv[3]))
 
