@@ -1,9 +1,12 @@
 from rasterio.features import shapes
 import rasterio
 import pyproj
+import matplotlib.pyplot as plt
+import mpl_toolkits.mplot3d as Axes3D
 from shapely.ops import transform
 from shapely.geometry import shape, LineString, Polygon, MultiPolygon
 from shapely.strtree import STRtree
+from shapely.wkb import loads, dumps
 
 import json
 import math
@@ -87,16 +90,9 @@ def get_vector_from_raster(rasterfile):
     return list(results)
 
 
-def get_shapes_from_vector(vectors):
+def get_shapes_from_vector(vectors, proj):
     alt_dict = {}
     shapes = []
-
-    first_tup = vectors[0]['geometry']['coordinates'][0][0]
-
-    print(first_tup)
-
-
-    proj = utm_proj(first_tup[1], first_tup[0])
 
     def transform_to_proj(x, y, z=None):
         return pyproj.transform(wgs84, proj, x, y, z)
@@ -109,7 +105,7 @@ def get_shapes_from_vector(vectors):
 
     print("transforming the vectors took {0} seconds".format(time.time() - init_time))
 
-    return shapes, alt_dict, proj
+    return shapes, alt_dict
 
 
 
@@ -131,7 +127,6 @@ def plan_path(path, strtree, alt_dict, buffer):
     print("segments", segments)
 
     new_path  = []
-    new_path.append((path[0][0], path[0][1], 0))
 
     for seg in segments:
         seg_points = []
@@ -159,15 +154,28 @@ def plan_path(path, strtree, alt_dict, buffer):
         print("Finished Segment in {0}".format(time.time() - init_time))
     return new_path
 
-def read_init_path(filepath, proj):
+def read_init_path(filepath):
     miss_dict = json.load(open(filepath))
+
+    proj = None
 
     tups = []
     for wp in miss_dict:
+        if proj == None:
+            proj = utm_proj(wp['latitude'], wp['longitude'])
         x, y, z = pyproj.transform(wgs84, proj, wp['longitude'], wp['latitude'],0)
         tups.append((x, y, z))
 
-    return tups
+    return tups, proj
+
+def display_path(path, shapes, alt_dict):
+    x, y, z = zip(*path)
+    
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    
+    ax.plot(x, y, z)
+    plt.show()
 
 #Also does projection
 def save_path(filepath, path, proj):
@@ -184,20 +192,44 @@ def save_path(filepath, path, proj):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 4:
-        print("required arguments: geotiff file + path file + buffer")
-        sys.exit()
+    from argparse import ArgumentParser
 
+    parser = ArgumentParser(description="Generate a path for an Aerial Lidar drone")
+    parser.add_argument("path_file", metavar="INPUT", type=str, help="The original path to modify")
+    parser.add_argument("buffer", metavar="buffer", type=float, help="amount of space to leave between surface and path in meters")
+    parser.add_argument("outfile", metavar="OUTPUT", type=str, help="File to write the output json into", default="path.json")
+    parser.add_argument("--geotif", type=str, help="geotif file to load data from", required=False)
+    parser.add_argument("--alt-dict", type=str, help="altitude map to save to or read from depending on the --geotif flag", required=True)
+    parser.add_argument("--wkb-bin", type=str, help="shapely wkb file to save to or read from depending on the --geotif flag", required=True)
 
+    args = parser.parse_args()
 
-    vectors = get_vector_from_raster(sys.argv[1])
+    miss_waypoints, proj = read_init_path(args.path_file)
 
-    shapes, alt_dict, proj = get_shapes_from_vector(vectors)
+    if args.geotif:
+        vectors = get_vector_from_raster(args.geotif)
+        shapes, alt_dict = get_shapes_from_vector(vectors, proj)
 
-    miss_waypoints = read_init_path(sys.argv[2], proj)
+        binary = dumps(MultiPolygon(shapes))
+
+        with open(args.wkb_bin, "w") as wkb_file:
+            wkb_file.write(binary)
+        
+        with open(args.alt_dict, "w") as alt_dict_file:
+            json.dump(alt_dict, alt_dict_file)
+        
+    else:
+        with open(args.wkb_bin, "r") as wkb_file:
+            shapes = list(loads(wkb_file.read()))
+        
+        with open(args.alt_dict) as alt_dict_file:
+            alt_dict = json.load(alt_dict_file)
+
 
     tree = STRtree(shapes)
 
-    new_path = plan_path(miss_waypoints, tree, alt_dict, float(sys.argv[3]))
+    new_path = plan_path(miss_waypoints, tree, alt_dict, args.buffer)
+
+    #display_path(new_path)
 
     save_path('path.json', new_path, proj)
