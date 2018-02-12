@@ -2,4 +2,4 @@ LaserVision-venv
 mav.*
 *.pyc
 __pycache__
-*.tif
+ucsd-dsm.tif
