@@ -7,6 +7,8 @@
 ---*-----------------------------------------------------------------------*'''
 
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+
 import numpy as np
 from PIL import Image
 from math import hypot
@@ -14,6 +16,7 @@ from math import hypot
 '''[Config vars]------------------------------------------------------------'''
 RASTER_FILE = "test.tif"
 HEIGHT_TOL = 3
+PATH_SPACING = 2
 
 '''[gen_path]------------------------------------------------------------------
   Adjusts waypoints as necessary to place them over surface model in raster,
@@ -21,24 +24,31 @@ HEIGHT_TOL = 3
 
   return - list of points in x,y,z coordinates representing waypoints
 ----------------------------------------------------------------------------'''
-def gen_path(raster, waypoints):
+def gen_path(surface_raster, waypoints):
 
-  path_points = []
+  #path_points = []
+  x_points = []
+  y_points = []
+  z_points = []
 
   if len(waypoints) < 2:
     return path_points
 
   for i in range(len(waypoints) - 1):
-    path_points.extend(gen_segment(raster, waypoints[i], waypoints[i + 1]))
+    x, y, z = gen_segment(surface_raster, waypoints[i], waypoints[i + 1])
+    x_points.extend(x)
+    y_points.extend(y)
+    z_points.extend(z)
+    #path_points.extend(gen_segment(surface_raster, waypoints[i], waypoints[i + 1]))
 
-  return path_points
+  return x_points, y_points, z_points
 
 '''[gen_segment]---------------------------------------------------------------
   Creates a segment from the x and y coordinates in the raster.
 
   return - list of x, y, z points interpolated between two waypoints
 ----------------------------------------------------------------------------'''
-def gen_segment(raster, wp0, wp1):
+def gen_segment(surface_raster, wp0, wp1):
   src_x = wp0[0]
   src_y = wp0[1]
 
@@ -57,16 +67,34 @@ def gen_segment(raster, wp0, wp1):
   x = src_x
   y = src_y
 
-  points = []
+  x_points = []
+  y_points = []
+  z_points = []
+  #points = []
+
   while curr_dist < seg_dist:
-    points.append([x, y, raster[int(y)][int(x)]])
-    x += delta_x / seg_dist
-    y += delta_y / seg_dist
-    curr_dist += 1
+    # calculate avoid height (can also utilize bare earth model in future)
+    avoid_height = HEIGHT_TOL
 
-  points.append([dest_x, dest_y, raster[int(dest_y)][int(dest_x)]])
+    # stay the designated height above the surface model
+    x_points.append(x)
+    y_points.append(y)
+    z_points.append(surface_raster[int(y)][int(x)] + avoid_height)
+    #points.append([x, y, surface_raster[int(y)][int(x)] + avoid_height])
 
-  return points
+    x += delta_x * PATH_SPACING / seg_dist
+    y += delta_y * PATH_SPACING / seg_dist
+    curr_dist += PATH_SPACING
+
+  # calculate avoid height
+  avoid_height = HEIGHT_TOL
+  
+  x_points.append(dest_x)
+  y_points.append(dest_y)
+  z_points.append(surface_raster[int(dest_y)][int(dest_x)] + avoid_height)
+  #points.append([dest_x, dest_y, surface_raster[int(dest_y)][int(dest_x)] + avoid_height])
+
+  return x_points, y_points, z_points
 
 '''[raster_line]---------------------------------------------------------------
   Find all raster coordinates that are on path between two waypoints
@@ -140,14 +168,19 @@ def read_tif(filename):
 def main():
   image = read_tif(RASTER_FILE)
 
-  waypoints = [(0, 100), (199, 100)]
+  waypoints = [(0, 100), (199, 199)]
 
   #plt.imshow(image)
   #plt.show()
   #print(image)
   #print(image.shape)
-  path = gen_path(image, waypoints)
-  print(path)
+  x_points, y_points, z_points = gen_path(image, waypoints)
+  
+  fig = plt.figure()
+  ax = fig.add_subplot(111, projection='3d')
+  ax.plot(x_points, y_points, zs=z_points)
+  plt.show()
+
   #print(raster_line([0,0], [1,7]))
 
 if __name__ == '__main__':
