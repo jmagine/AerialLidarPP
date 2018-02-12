@@ -7,4 +7,6 @@ install:
 - sudo python -m pip -r requirements.txt
 
 script:
-    - make runsitl
+    - ~/.dronekit/sitl/copter-3.3/apm  & 
+    - python sitl/sitl.py 5760 sitl/test_mission.json
+
