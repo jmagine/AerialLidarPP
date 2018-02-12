@@ -4,6 +4,7 @@ click==6.7
 click-plugins==1.0.3
 cligj==0.4.0
 cycler==0.10.0
+Cython==0.27.3
 descartes==1.1.0
 dronekit==2.9.1
 dronekit-sitl==3.2.0
