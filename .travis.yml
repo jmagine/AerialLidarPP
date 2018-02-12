@@ -3,7 +3,6 @@ language: python2
 sudo: true
 
 install:
-- sudo apt-get install python-dev python-opencv python-wxgtk3.0 python-pip python-matplotlib python-pygame python-lxml
 - sudo python -m pip -r requirements.txt
 
 script:
