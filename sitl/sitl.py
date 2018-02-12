@@ -3,6 +3,7 @@ from dronekit import connect, VehicleMode, LocationGlobalRelative, LocationGloba
 import sys
 import json
 import time
+import math
 
 time.sleep(10)
 
@@ -11,7 +12,7 @@ if len(sys.argv) != 3:
     sys.exit()
 
 print("Connecting on port {0}".format(sys.argv[1]))
-connection_string = "127.0.0.1:{0}".format(sys.argv[1])
+connection_string = "tcp:127.0.0.1:{0}".format(sys.argv[1])
 print(connection_string)
 
 vehicle = connect(connection_string, wait_ready=True)
@@ -39,6 +40,8 @@ for cmd in mission:
     cmd = Command(0, 0, 0, mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT, nav_type, 0, 0, 0, 0, 0, 0, lat, lon, alt)
     cmds.add(cmd)
 
+cmds.upload()
+
 def arm_and_takeoff(aTargetAltitude):
     """
     Arms vehicle and fly to aTargetAltitude.
@@ -50,7 +53,7 @@ def arm_and_takeoff(aTargetAltitude):
         print(" Waiting for vehicle to initialise...")
         time.sleep(1)
 
-        
+
     print("Arming motors")
     # Copter should arm in GUIDED mode
     vehicle.mode = VehicleMode("GUIDED")
@@ -74,7 +77,7 @@ def arm_and_takeoff(aTargetAltitude):
 
 arm_and_takeoff(30)
 
-vehicle.commands.next=0
+#vehicle.commands.next=0
 
 # Set mode to AUTO to start mission
 vehicle.mode = VehicleMode("AUTO")

@@ -3,8 +3,9 @@ language: python2
 sudo: true
 
 install:
-- sudo apt-get install python-dev python-opencv python-wxgtk3.0 python-pip python-matplotlib python-pygame python-lxml
-- sudo python -m pip -r requirements.txt
+- sudo python -m pip install -r requirements.txt
 
 script:
-    - make runsitl
+    - ~/.dronekit/sitl/copter-3.3/apm --home=-35.363261,149.165230,584,353 --model=quad &
+    - python sitl/sitl.py 5760 sitl/test_mission.json
+
