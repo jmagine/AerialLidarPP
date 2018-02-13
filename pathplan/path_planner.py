@@ -128,30 +128,48 @@ def plan_path(path, strtree, alt_dict, buffer):
 
     new_path  = []
 
+    sorting_time = 0
+    query_time = 0
+    total_time = 0
+    intersection_time = 0
+    pure_inter_time = 0
+
     for seg in segments:
         seg_points = []
         init_time = time.time()
         print("Started Segment")
         ls = LineString(seg)
+        query_start = time.time()
         intersecting = list(strtree.query(ls))
+        query_time += time.time() - query_start
 
         print("R Tree query returns {0} intersections".format(len(intersecting)))
+        inter_start = time.time()
         for inter in intersecting:
 
+            pure_inter_start = time.time()
             intersection = inter.intersection(ls)
-            print("wkt", intersection.wkt)
-            print("type", type(intersection))
+            pure_inter_time += time.time() - pure_inter_start
   
-            if 'line' in intersection.wkt.lower():
+            if not intersection.is_empty:
                 for coord in intersection.coords:
                     alt = alt_dict[inter.wkt]
                     seg_points.append((coord[0], coord[1], alt + buffer))
 
+        intersection_time += time.time() - inter_start 
+        sort_start = time.time()
         seg_points = list(sorted(seg_points, key=lambda x: distance(seg[0], x)))
+        sorting_time += time.time() - sort_start
 
-        new_path += seg_points
+        new_path.extend(seg_points)
+        this_seg = time.time() - init_time
+        print("Finished Segment in {0}".format(this_seg))
 
-        print("Finished Segment in {0}".format(time.time() - init_time))
+    print("Total sorting time {0}".format(sorting_time))
+    print("Total intersection time {0}".format(intersection_time))
+    print("Total pure intersection time {0}".format(pure_inter_time))
+    print("Total query time {0}".format(query_time))
+
     return new_path
 
 def read_init_path(filepath):
@@ -212,14 +230,14 @@ if __name__ == '__main__':
 
         binary = dumps(MultiPolygon(shapes))
 
-        with open(args.wkb_bin, "w") as wkb_file:
+        with open(args.wkb_bin, "wb") as wkb_file:
             wkb_file.write(binary)
         
         with open(args.alt_dict, "w") as alt_dict_file:
             json.dump(alt_dict, alt_dict_file)
         
     else:
-        with open(args.wkb_bin, "r") as wkb_file:
+        with open(args.wkb_bin, "rb") as wkb_file:
             shapes = list(loads(wkb_file.read()))
         
         with open(args.alt_dict) as alt_dict_file:
