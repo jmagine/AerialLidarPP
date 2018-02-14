@@ -8,6 +8,7 @@
 
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+from matplotlib import cm
 
 import numpy as np
 from PIL import Image
@@ -16,7 +17,7 @@ from math import hypot
 '''[Config vars]------------------------------------------------------------'''
 RASTER_FILE = "test.tif"
 HEIGHT_TOL = 3
-PATH_SPACING = 2
+PATH_SPACING = 0.5
 
 '''[gen_path]------------------------------------------------------------------
   Adjusts waypoints as necessary to place them over surface model in raster,
@@ -168,7 +169,7 @@ def read_tif(filename):
 def main():
   image = read_tif(RASTER_FILE)
 
-  waypoints = [(0, 100), (199, 199)]
+  waypoints = [(0, 0), (199, 199), (0, 199), (199, 0)]
 
   #plt.imshow(image)
   #plt.show()
@@ -176,9 +177,14 @@ def main():
   #print(image.shape)
   x_points, y_points, z_points = gen_path(image, waypoints)
   
+  x_raster = np.arange(0, image.shape[0], step=1)
+  y_raster = np.arange(0, image.shape[1], step=1)
+  x_raster, y_raster = np.meshgrid(x_raster, y_raster)
+
   fig = plt.figure()
   ax = fig.add_subplot(111, projection='3d')
   ax.plot(x_points, y_points, zs=z_points)
+  ax.plot_surface(y_raster, x_raster, image, cmap=cm.coolwarm,linewidth=0, antialiased=False)
   plt.show()
 
   #print(raster_line([0,0], [1,7]))
