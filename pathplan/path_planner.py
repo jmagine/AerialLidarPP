@@ -6,7 +6,9 @@ import mpl_toolkits.mplot3d as Axes3D
 from shapely.ops import transform
 from shapely.geometry import shape, LineString, Polygon, MultiPolygon
 from shapely.strtree import STRtree
-from shapely.wkb import loads, dumps
+from shapely.wkb import dumps
+from utils import load_shapefile, load_altfile
+
 
 import json
 import math
@@ -154,7 +156,15 @@ def plan_path(path, strtree, alt_dict, buffer):
             if not intersection.is_empty:
                 for coord in intersection.coords:
                     alt = alt_dict[inter.wkt]
-                    seg_points.append((coord[0], coord[1], alt + buffer))
+                    #d_x =  seg[0][0] - coord[0] 
+                    #d_y =  seg[0][1] - coord[1]
+                    #norm = (d_x**2 + d_y**2)**.5
+                    #d_x = buffer * (d_x / norm)
+                    #d_y = buffer * (d_y / norm)
+                    d_x = 0
+                    d_y = 0
+
+                    seg_points.append((coord[0] + d_x, coord[1] + d_y, alt + buffer))
 
         intersection_time += time.time() - inter_start 
         sort_start = time.time()
@@ -172,17 +182,20 @@ def plan_path(path, strtree, alt_dict, buffer):
 
     return new_path
 
-def read_init_path(filepath):
-    miss_dict = json.load(open(filepath))
+def read_init_path(filepath, use_proj):
+    miss_dict = json.load(open("input/"+filepath))
 
     proj = None
 
     tups = []
     for wp in miss_dict:
-        if proj == None:
+        if proj == None and use_proj:
             proj = utm_proj(wp['latitude'], wp['longitude'])
-        x, y, z = pyproj.transform(wgs84, proj, wp['longitude'], wp['latitude'],0)
-        tups.append((x, y, z))
+        if use_proj: 
+            coord = pyproj.transform(wgs84, proj, wp['longitude'], wp['latitude'],0)
+        else:
+            coord = (wp['latitude'], wp['longitude'], 0)
+        tups.append(coord)
 
     return tups, proj
 
@@ -198,8 +211,9 @@ def display_path(path, shapes, alt_dict):
 #Also does projection
 def save_path(filepath, path, proj):
     arr = []
-    for x, y, z in path:
-        lon, lat, alt = pyproj.transform(proj, wgs84, x, y, z)
+    for lon, lat, alt in path:
+        if proj != None:
+            lon, lat, alt = pyproj.transform(proj, wgs84, lon, lat, alt)
         new_dict = {'latitude' : lat, 'longitude' : lon, 'altitude' : alt}
         arr.append(new_dict)
 
@@ -211,43 +225,45 @@ def save_path(filepath, path, proj):
 
 if __name__ == '__main__':
     from argparse import ArgumentParser
+    import os
 
     parser = ArgumentParser(description="Generate a path for an Aerial Lidar drone")
     parser.add_argument("path_file", metavar="INPUT", type=str, help="The original path to modify")
+    parser.add_argument("geotif", type=str, help="geotif file to load data from")
     parser.add_argument("buffer", metavar="buffer", type=float, help="amount of space to leave between surface and path in meters")
-    parser.add_argument("outfile", metavar="OUTPUT", type=str, help="File to write the output json into", default="path.json")
-    parser.add_argument("--geotif", type=str, help="geotif file to load data from", required=False)
-    parser.add_argument("--alt-dict", type=str, help="altitude map to save to or read from depending on the --geotif flag", required=True)
-    parser.add_argument("--wkb-bin", type=str, help="shapely wkb file to save to or read from depending on the --geotif flag", required=True)
+    parser.add_argument("--gen", action='store_true', help="If set, the script uses the already generated files", required=False)
+    parser.add_argument("--proj", action='store_true', help="If set, converts from gps to alternate cartesian projection", required=False)
+    parser.add_argument("--plot", action='store_true', help="If set, plots the path", required=False)
 
     args = parser.parse_args()
 
-    miss_waypoints, proj = read_init_path(args.path_file)
+    miss_waypoints, proj = read_init_path(args.path_file, args.proj)
 
-    if args.geotif:
-        vectors = get_vector_from_raster(args.geotif)
+    if not args.gen:
+
+        if not os.path.exists("gen"):
+            os.makedirs("gen")
+
+        vectors = get_vector_from_raster("../images/" + args.geotif)
         shapes, alt_dict = get_shapes_from_vector(vectors, proj)
 
         binary = dumps(MultiPolygon(shapes))
 
-        with open(args.wkb_bin, "wb") as wkb_file:
+        with open("gen/"+args.geotif+".shapes", "wb") as wkb_file:
             wkb_file.write(binary)
         
-        with open(args.alt_dict, "w") as alt_dict_file:
+        with open("gen/"+args.geotif+".alt.json", "w") as alt_dict_file:
             json.dump(alt_dict, alt_dict_file)
-        
-    else:
-        with open(args.wkb_bin, "rb") as wkb_file:
-            shapes = list(loads(wkb_file.read()))
-        
-        with open(args.alt_dict) as alt_dict_file:
-            alt_dict = json.load(alt_dict_file)
 
+    else:
+        shapes = load_shapefile(args.geotif)
+        alt_dict = load_altfile(args.geotif)
 
     tree = STRtree(shapes)
 
     new_path = plan_path(miss_waypoints, tree, alt_dict, args.buffer)
 
-    #display_path(new_path)
+    if args.plot:
+        display_path(new_path, shapes, alt_dict)
 
-    save_path('path.json', new_path, proj)
+    save_path("output/results-" + args.path_file, new_path, proj)

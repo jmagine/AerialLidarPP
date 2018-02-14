@@ -3,3 +3,7 @@ mav.*
 *.pyc
 __pycache__
 *.tif
+gen/
+eeprom.bin
+terrain/
+logs/
