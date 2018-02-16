@@ -15,7 +15,7 @@ from PIL import Image
 from math import hypot
 
 '''[Config vars]------------------------------------------------------------'''
-RASTER_FILE = "test.tif"
+RASTER_FILE = "ucsd-dsm.tif"
 HEIGHT_TOL = 3
 PATH_SPACING = 0.5
 
@@ -162,6 +162,30 @@ def read_tif(filename):
   image = np.array(image)
   return image
 
+def display_path(packed_waypoints, image, small=True):
+  x_points, y_points, z_points = packed_waypoints
+
+  fig = plt.figure()
+  ax = fig.add_subplot(111, projection='3d')
+  ax.plot(y_points, x_points, zs=z_points)
+
+  if small:
+    max_x = max(x_points)
+    max_y = max(y_points)
+    print(max_x, max_y)
+    print(image[0:max_y+1, 0:max_x+1].shape)
+
+    x_raster = np.arange(0, max_x + 1, step=1)
+    y_raster = np.arange(0, max_y + 1, step=1)
+    x_raster, y_raster = np.meshgrid(x_raster, y_raster)
+    ax.plot_surface(y_raster, x_raster, image[0:max_y+1, 0:max_x+1], cmap=cm.coolwarm,linewidth=0, antialiased=False)
+  else:
+    x_raster = np.arange(0, image.shape[1], step=1)
+    y_raster = np.arange(0, image.shape[0], step=1)
+    x_raster, y_raster = np.meshgrid(x_raster, y_raster)
+    ax.plot_surface(y_raster, x_raster, image, cmap=cm.coolwarm,linewidth=0, antialiased=False)
+  plt.show()
+
 '''[main]----------------------------------------------------------------------
   Drives program, reads image in, uses waypoints to generate path, and writes
   path to json file.
@@ -173,21 +197,13 @@ def main():
 
   #plt.imshow(image)
   #plt.show()
-  #print(image)
-  #print(image.shape)
-  x_points, y_points, z_points = gen_path(image, waypoints)
+  print(image)
+  print(image.shape)
+  packed_waypoints = gen_path(image, waypoints)
   
-  x_raster = np.arange(0, image.shape[0], step=1)
-  y_raster = np.arange(0, image.shape[1], step=1)
-  x_raster, y_raster = np.meshgrid(x_raster, y_raster)
+  display_path(packed_waypoints, image)
 
-  fig = plt.figure()
-  ax = fig.add_subplot(111, projection='3d')
-  ax.plot(x_points, y_points, zs=z_points)
-  ax.plot_surface(y_raster, x_raster, image, cmap=cm.coolwarm,linewidth=0, antialiased=False)
-  plt.show()
-
-  #print(raster_line([0,0], [1,7]))
+  print(raster_line([0,0], [1,7]))
 
 if __name__ == '__main__':
   main()
