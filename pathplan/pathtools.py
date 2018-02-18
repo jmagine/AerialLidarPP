@@ -4,7 +4,13 @@ of the path when running through simulation or in real time. This file also
 includes functions to add noise to waypoints to test. For example, the
 default noise function over a mean of 0 and a std of 1 will give a MSE of
 around 1 usually.
+
+NOTE: This file uses Generators, Lists, Numpy Arrays interchangely, but
+will do conversions from generators to lists to numpy arrays if necessary.
 """
+from mpl_toolkits.mplot3d import Axes3D
+
+import matplotlib.pyplot as plt
 import numpy as np
 import json
 
@@ -29,7 +35,7 @@ def read_path_from_json(filepath):
     return map(to_xyz, points)
 
 def default_noise(val):
-    return val + np.random.normal(0, 1)
+    return val + np.random.normal(0, 0.000035)
 
 def gen_noise_points(waypoints, noise=default_noise):
     add_noise = lambda x, y, z: (noise(x), noise(y), noise(z))
@@ -57,9 +63,24 @@ def mse(expected, actual):
     return ((expected - actual)**2).mean()
 
 def calc_errors_with_gen_noise(filepath, metric=mse):
-    waypoints = read_path_from_json("path.json")
+    waypoints = read_path_from_json(filepath)
     noise_pts = gen_noise_points(waypoints)
     return metric(expected=waypoints, actual=noise_pts)
+
+
+
+
+def display_gen_noise_path(waypoints, noise_pts):
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.plot(*np.array(waypoints).T, marker='o', color='b')
+    ax.plot(*np.array(noise_pts).T, marker='o', color='r')
+    plt.show()
+
+def display_gen_noise_path_with_file(filepath):
+    waypoints = read_path_from_json(filepath)
+    noise_pts = gen_noise_points(waypoints)
+    display_gen_noise_path(waypoints, noise_pts)
 
 
 
@@ -67,6 +88,8 @@ def calc_errors_with_gen_noise(filepath, metric=mse):
 def main():
     err = calc_errors_with_gen_noise("path.json", metric=mse)
     print("MSE={}".format(err))
+
+    display_gen_noise_path_with_file("path.json")
 
 # Uncomment to test
 # if __name__ == "__main__":
