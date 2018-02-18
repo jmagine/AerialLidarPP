@@ -60,7 +60,7 @@ def mse(expected, actual):
     expected = to_np_array(generator_to_list(expected))
     actual = to_np_array(generator_to_list(actual))
 
-    return ((expected - actual)**2).mean()
+    return ((expected - actual)**2).mean(axis=0) # avg along columns
 
 def calc_errors_with_gen_noise(filepath, metric=mse):
     waypoints = read_path_from_json(filepath)
