@@ -34,12 +34,28 @@ def read_path_from_json(filepath):
     points = json.load(open(filepath))
     return map(to_xyz, points)
 
-def default_noise(val):
-    return val + np.random.normal(0, 0.000035)
+def default_noise(val=0):
+    return val + np.random.normal(0, 1.2)
 
 def gen_noise_points(waypoints, noise=default_noise):
-    add_noise = lambda x, y, z: (noise(x), noise(y), noise(z))
-    return map(lambda xyz: add_noise(*xyz), waypoints)
+    # For each point in waypoints, generate a new line perpendicular to it
+    # using point[i] and point[i+1] as the line. Having this line, select
+    # randomly one of the nonzero values on this line and add it to the 
+    # original point[i] to generate a new point in space.
+
+    UP = np.array([0, 0, 1]) # altitude is stored in z-coordinate
+
+    waypoints = map(lambda pt: np.array(pt), waypoints)
+    past_point = next(waypoints)
+
+    for pt in waypoints:
+        line = pt - past_point
+        perpendicular = np.cross(line, UP)
+        noise_line = perpendicular * noise()
+        yield noise_line + past_point
+        past_point = pt
+
+    yield past_point
 
 def gen_noise_points_from_file(filepath):
     waypoints = read_path_from_json(filepath)
@@ -63,8 +79,8 @@ def mse(expected, actual):
     return ((expected - actual)**2).mean(axis=0) # avg along columns
 
 def calc_errors_with_gen_noise(filepath, metric=mse):
-    waypoints = read_path_from_json(filepath)
-    noise_pts = gen_noise_points(waypoints)
+    waypoints = list(read_path_from_json(filepath))
+    noise_pts = list(gen_noise_points(waypoints))
     return metric(expected=waypoints, actual=noise_pts)
 
 
@@ -78,8 +94,8 @@ def display_gen_noise_path(waypoints, noise_pts):
     plt.show()
 
 def display_gen_noise_path_with_file(filepath):
-    waypoints = read_path_from_json(filepath)
-    noise_pts = gen_noise_points(waypoints)
+    waypoints = list(read_path_from_json(filepath))
+    noise_pts = list(gen_noise_points(waypoints))
     display_gen_noise_path(waypoints, noise_pts)
 
 
@@ -92,5 +108,5 @@ def main():
     display_gen_noise_path_with_file("path.json")
 
 # Uncomment to test
-# if __name__ == "__main__":
-#     main()
+if __name__ == "__main__":
+    main()
