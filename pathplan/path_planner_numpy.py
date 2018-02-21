@@ -13,9 +13,10 @@ from matplotlib import cm
 import numpy as np
 from PIL import Image
 from math import hypot
+from utils import plot_path, read_tif
 
 '''[Config vars]------------------------------------------------------------'''
-RASTER_FILE = "test.tif"
+RASTER_FILE = "../images/rand_squares.tif"
 HEIGHT_TOL = 3
 PATH_SPACING = 0.5
 

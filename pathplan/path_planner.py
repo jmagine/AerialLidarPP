@@ -7,7 +7,7 @@ from shapely.ops import transform
 from shapely.geometry import shape, LineString, Polygon, MultiPolygon
 from shapely.strtree import STRtree
 from shapely.wkb import dumps
-from utils import load_shapefile, load_altfile
+from utils import load_shapefile, load_altfile, plot_path, read_tif
 
 
 import json
@@ -264,6 +264,7 @@ if __name__ == '__main__':
     new_path = plan_path(miss_waypoints, tree, alt_dict, args.buffer)
 
     if args.plot:
-        display_path(new_path, shapes, alt_dict)
+        x, y, z = zip(*new_path)
+        plot_path(read_tif("../images/" +args.geotif), x, y, z)
 
     save_path("output/results-" + args.path_file, new_path, proj)

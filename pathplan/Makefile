@@ -9,7 +9,7 @@ genucsd:
 genucsdnotiff: 
 	python path_planner.py --gen --proj ucsd-test.json ucsd-dsm.tif 5
 
-benchmarkucsd: genucsdnotiff killsitl startsitl 
+benchmarkucsd: killsitl startsitl 
 	python sitl.py 5760 results-ucsd-test.json
 	cp logs/1.BIN bin/ucsd.BIN
 	python eval_path.py ucsd.BIN ucsd-test.json ucsd.shapes ucsd.alt.json
