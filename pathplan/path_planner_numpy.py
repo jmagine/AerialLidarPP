@@ -68,6 +68,7 @@ def gen_segment(surface_raster, wp0, wp1):
   # Find all points in between src and dest
   # This will be needed when smoothing based on heights!
   #cells = raster_line(wp0, wp1)
+  #iterate over points, delete sides if both are lower, repeat if sides deleted
 
   curr_dist = 0
   x = src_x
@@ -183,7 +184,7 @@ def display_path(packed_waypoints, image, small=True):
 
   fig = plt.figure()
   ax = fig.add_subplot(111, projection='3d')
-  ax.plot(y_points, x_points, zs=z_points)
+  ax.plot(x_points, y_points, zs=z_points)
 
   if small:
     max_x = max(x_points)
@@ -194,12 +195,12 @@ def display_path(packed_waypoints, image, small=True):
     x_raster = np.arange(0, max_x + 1, step=1)
     y_raster = np.arange(0, max_y + 1, step=1)
     x_raster, y_raster = np.meshgrid(x_raster, y_raster)
-    ax.plot_surface(y_raster, x_raster, image[0:max_y+1, 0:max_x+1], cmap=cm.coolwarm,linewidth=0, antialiased=False)
+    ax.plot_surface(x_raster, y_raster, image[0:max_y+1, 0:max_x+1], cmap=cm.coolwarm,linewidth=0, antialiased=False)
   else:
     x_raster = np.arange(0, image.shape[1], step=1)
     y_raster = np.arange(0, image.shape[0], step=1)
     x_raster, y_raster = np.meshgrid(x_raster, y_raster)
-    ax.plot_surface(y_raster, x_raster, image, cmap=cm.coolwarm,linewidth=0, antialiased=False)
+    ax.plot_surface(x_raster, y_raster, image, cmap=cm.coolwarm,linewidth=0, antialiased=False)
   
   plt.show()
 
