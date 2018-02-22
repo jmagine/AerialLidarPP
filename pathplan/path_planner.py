@@ -92,9 +92,14 @@ def get_vector_from_raster(rasterfile):
     return list(results)
 
 
-def get_shapes_from_vector(vectors, proj):
+def get_shapes_from_vector(vectors):
     alt_dict = {}
     shapes = []
+
+    #lol at the way that works
+    lat, lon = vectors[0]['geometry']['coordinates'][0][0]
+
+    proj = utm_proj(lat, lon)
 
     def transform_to_proj(x, y, z=None):
         return pyproj.transform(wgs84, proj, x, y, z)
@@ -182,19 +187,17 @@ def plan_path(path, strtree, alt_dict, buffer):
 
     return new_path
 
-def read_init_path(filepath, use_proj):
-    miss_dict = json.load(open("input/"+filepath))
+def read_init_path(filepath):
+    miss_dict = json.load(open(filepath))
 
     proj = None
 
     tups = []
     for wp in miss_dict:
-        if proj == None and use_proj:
+        if proj == None:
             proj = utm_proj(wp['latitude'], wp['longitude'])
-        if use_proj: 
-            coord = pyproj.transform(wgs84, proj, wp['longitude'], wp['latitude'],0)
-        else:
-            coord = (wp['latitude'], wp['longitude'], 0)
+
+        coord = pyproj.transform(wgs84, proj, wp['longitude'], wp['latitude'],0)
         tups.append(coord)
 
     return tups, proj
@@ -229,23 +232,20 @@ if __name__ == '__main__':
 
     parser = ArgumentParser(description="Generate a path for an Aerial Lidar drone")
     parser.add_argument("path_file", metavar="INPUT", type=str, help="The original path to modify")
-    parser.add_argument("geotif", type=str, help="geotif file to load data from")
+    parser.add_argument("shapes", metavar="SHAPES", type=str, help="Shape file")
+    parser.add_argument("alt", metavar="ALT", type=str, help="Altitude file")
+    parser.add_argument("output", metavar="OUT", type=str, help="Filepath to output the generated path to")
     parser.add_argument("buffer", metavar="buffer", type=float, help="amount of space to leave between surface and path in meters")
-    parser.add_argument("--gen", action='store_true', help="If set, the script uses the already generated files", required=False)
-    parser.add_argument("--proj", action='store_true', help="If set, converts from gps to alternate cartesian projection", required=False)
-    parser.add_argument("--plot", action='store_true', help="If set, plots the path", required=False)
+    parser.add_argument("--geotiff",  type=str, help="Contains the geotiff to generate the files from",  required=False)
 
     args = parser.parse_args()
 
-    miss_waypoints, proj = read_init_path(args.path_file, args.proj)
+    miss_waypoints, proj = read_init_path(args.path_file)
 
-    if not args.gen:
+    if args.geotiff:
 
-        if not os.path.exists("gen"):
-            os.makedirs("gen")
-
-        vectors = get_vector_from_raster("../images/" + args.geotif)
-        shapes, alt_dict = get_shapes_from_vector(vectors, proj)
+        vectors = get_vector_from_raster(args.geotif)
+        shapes, alt_dict = get_shapes_from_vector(vectors)
 
         binary = dumps(MultiPolygon(shapes))
 
@@ -256,15 +256,11 @@ if __name__ == '__main__':
             json.dump(alt_dict, alt_dict_file)
 
     else:
-        shapes = load_shapefile(args.geotif)
-        alt_dict = load_altfile(args.geotif)
+        shapes = load_shapefile(args.shapes)
+        alt_dict = load_altfile(args.alt)
 
     tree = STRtree(shapes)
 
     new_path = plan_path(miss_waypoints, tree, alt_dict, args.buffer)
 
-    if args.plot:
-        x, y, z = zip(*new_path)
-        plot_path(read_tif("../images/" +args.geotif), x, y, z)
-
-    save_path("output/results-" + args.path_file, new_path, proj)
+    save_path(args.output, new_path, proj)

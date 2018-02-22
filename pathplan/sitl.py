@@ -23,7 +23,7 @@ cmds = vehicle.commands
 
 cmds.clear()
 
-mission = json.load(open("output/"+sys.argv[2]))
+mission = json.load(open(sys.argv[2]))
 
 for cmd in mission:
     lat = cmd['latitude']

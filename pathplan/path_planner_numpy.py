@@ -23,8 +23,10 @@ PATH_SPACING = 0.5
 '''[gen_path]------------------------------------------------------------------
   Adjusts waypoints as necessary to place them over surface model in raster,
   and then interpolates values between raster.
-
-  return - list of points in x,y,z coordinates representing waypoints
+  
+  surface_raster - raster image containing surface map
+  waypoints - list of waypoints to hit with path
+  return - list of points in x,y,z coordinates representing revised waypoints
 ----------------------------------------------------------------------------'''
 def gen_path(surface_raster, waypoints):
 
@@ -47,7 +49,10 @@ def gen_path(surface_raster, waypoints):
 
 '''[gen_segment]---------------------------------------------------------------
   Creates a segment from the x and y coordinates in the raster.
-
+  
+  surface_raster - raster image containing surface map
+  wp0 - source waypoint
+  wp1 - dest waypoint
   return - list of x, y, z points interpolated between two waypoints
 ----------------------------------------------------------------------------'''
 def gen_segment(surface_raster, wp0, wp1):
@@ -64,6 +69,7 @@ def gen_segment(surface_raster, wp0, wp1):
   # Find all points in between src and dest
   # This will be needed when smoothing based on heights!
   #cells = raster_line(wp0, wp1)
+  #iterate over points, delete sides if both are lower, repeat if sides deleted
 
   curr_dist = 0
   x = src_x
@@ -100,7 +106,9 @@ def gen_segment(surface_raster, wp0, wp1):
 
 '''[raster_line]---------------------------------------------------------------
   Find all raster coordinates that are on path between two waypoints
-
+  
+  wp0 - source waypoint
+  wp1 - dest waypoint
   return - list of coordinates between two waypoints
 ----------------------------------------------------------------------------'''
 def raster_line(wp0, wp1):
@@ -149,7 +157,8 @@ def raster_line(wp0, wp1):
 
 '''[read_tif]------------------------------------------------------------------
   Reads tif image into numpy array
-
+  
+  filename - filename of tif image
   return - numpy array containing elevation map
 ----------------------------------------------------------------------------'''
 def read_tif(filename):
@@ -163,6 +172,39 @@ def read_tif(filename):
   image = np.array(image)
   return image
 
+'''[display_path]--------------------------------------------------------------
+  Visualizes path over surface map
+  
+  packed_waypoints - 1 list for each dimension of waypoints (x,y,z)
+  image - raster image containing surface map
+  small - whether to only show part of image relevant to path
+  return - numpy array containing elevation map
+----------------------------------------------------------------------------'''
+def display_path(packed_waypoints, image, small=True):
+  x_points, y_points, z_points = packed_waypoints
+
+  fig = plt.figure()
+  ax = fig.add_subplot(111, projection='3d')
+  ax.plot(x_points, y_points, zs=z_points)
+
+  if small:
+    max_x = max(x_points)
+    max_y = max(y_points)
+    print(max_x, max_y)
+    print(image[0:max_y+1, 0:max_x+1].shape)
+
+    x_raster = np.arange(0, max_x + 1, step=1)
+    y_raster = np.arange(0, max_y + 1, step=1)
+    x_raster, y_raster = np.meshgrid(x_raster, y_raster)
+    ax.plot_surface(x_raster, y_raster, image[0:max_y+1, 0:max_x+1], cmap=cm.coolwarm,linewidth=0, antialiased=False)
+  else:
+    x_raster = np.arange(0, image.shape[1], step=1)
+    y_raster = np.arange(0, image.shape[0], step=1)
+    x_raster, y_raster = np.meshgrid(x_raster, y_raster)
+    ax.plot_surface(x_raster, y_raster, image, cmap=cm.coolwarm,linewidth=0, antialiased=False)
+  
+  plt.show()
+
 '''[main]----------------------------------------------------------------------
   Drives program, reads image in, uses waypoints to generate path, and writes
   path to json file.
@@ -170,23 +212,22 @@ def read_tif(filename):
 def main():
   image = read_tif(RASTER_FILE)
 
+  #[TODO] read waypoints from file
   waypoints = [(0, 0), (199, 199), (0, 199), (199, 0)]
 
+  #[TODO] possibly do some command line args
+
+  #[TODO] make some gps->raster and raster->gps coord functions
+
+  #[DEBUG]
   #plt.imshow(image)
   #plt.show()
-  #print(image)
-  #print(image.shape)
-  x_points, y_points, z_points = gen_path(image, waypoints)
-  
-  x_raster = np.arange(0, image.shape[0], step=1)
-  y_raster = np.arange(0, image.shape[1], step=1)
-  x_raster, y_raster = np.meshgrid(x_raster, y_raster)
+  print(image)
+  print(image.shape)
 
-  fig = plt.figure()
-  ax = fig.add_subplot(111, projection='3d')
-  ax.plot(x_points, y_points, zs=z_points)
-  ax.plot_surface(y_raster, x_raster, image, cmap=cm.coolwarm,linewidth=0, antialiased=False)
-  plt.show()
+  packed_waypoints = gen_path(image, waypoints)
+  
+  display_path(packed_waypoints, image)
 
   #print(raster_line([0,0], [1,7]))
 
