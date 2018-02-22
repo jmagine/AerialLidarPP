@@ -35,7 +35,7 @@ def read_path_from_json(filepath):
     return map(to_xyz, points)
 
 def default_noise(val=0):
-    return val + np.random.normal(0, 1.2)
+    return val + np.random.normal(0, 1.5)
 
 def gen_noise_points(waypoints, noise=default_noise):
     # For each point in waypoints, generate a new line perpendicular to it
@@ -56,6 +56,20 @@ def gen_noise_points(waypoints, noise=default_noise):
         past_point = pt
 
     yield past_point
+
+def gen_points_perpendicular(waypoints, noise=default_noise):
+    UP = np.array([0, 0, 1]) # altitude is stored in z-coordinate
+    waypoints = map(lambda pt: np.array(pt), waypoints)
+    # past = next(waypoints)
+
+    for pt in waypoints:
+        yield pt + 0.0001
+        # line = pt - past
+        # perpendicular = np.cross(line, UP)
+        # yield perpendicular * 5 + past
+        # past = pt
+
+    # yield past
 
 def gen_noise_points_from_file(filepath):
     waypoints = read_path_from_json(filepath)
@@ -98,14 +112,39 @@ def display_gen_noise_path_with_file(filepath):
     noise_pts = list(gen_noise_points(waypoints))
     display_gen_noise_path(waypoints, noise_pts)
 
+def display_surface(waypoints, noise_pts):
+    Z1 = 8.0
+    Z2 = 9.0
 
+    x1, y1, z1 = np.array(waypoints).T
+    x2, y2, z2 = np.array(noise_pts).T
+
+    i, h = np.meshgrid(np.arange(len(x1)), np.linspace(Z1, Z2, 10))
+    X = (x2[i] - x1[i]) / (Z2 - Z1) * (h - Z1) + x1[i]
+    Y = (y2[i] - y1[i]) / (Z2 - Z1) * (h - Z1) + y1[i]
+    Z = (z2[i] - z1[i]) / (Z2 - Z1) * (h - Z1) + z1[i]
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.plot(x1, y1, z1, 'k-', linewidth=3.0, color='b')
+    ax.plot(x2, y2, z2, 'k-', linewidth=3.0, color='m')
+    ax.plot_surface(X, Y, Z, color='r', alpha=0.4, linewidth=0)
+
+    plt.show()
+
+def display_surface_with_file(filepath):
+    waypoints = list(read_path_from_json(filepath))
+    noise_pts = list(gen_points_perpendicular(waypoints))
+    display_surface(waypoints, noise_pts)
 
 
 def main():
     err = calc_errors_with_gen_noise("path.json", metric=mse)
     print("MSE={}".format(err))
 
-    display_gen_noise_path_with_file("path.json")
+    # display_gen_noise_path_with_file("path.json")
+    display_surface_with_file("path.json")
+
 
 # Uncomment to test
 if __name__ == "__main__":
