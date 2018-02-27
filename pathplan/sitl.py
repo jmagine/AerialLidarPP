@@ -138,7 +138,7 @@ def distance_to_current_waypoint():
 while True:
     nextwaypoint=vehicle.commands.next
     print('Distance to waypoint (%s): %s' % (nextwaypoint, distance_to_current_waypoint()))
-    if nextwaypoint == len(mission): 
+    if nextwaypoint == len(mission)-1: 
         print("Exit 'standard' mission when start heading to final waypoint ({0})".format(len(mission)))
         break;
     time.sleep(1)

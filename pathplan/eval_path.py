@@ -61,6 +61,7 @@ if __name__ == '__main__':
 
 
     paths = []
+
     for path in args.paths:
         paths.append(json.load(open(path)))
  

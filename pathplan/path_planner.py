@@ -97,7 +97,7 @@ def get_shapes_from_vector(vectors):
     shapes = []
 
     #lol at the way that works
-    lat, lon = vectors[0]['geometry']['coordinates'][0][0]
+    lon, lat = vectors[0]['geometry']['coordinates'][0][0]
 
     proj = utm_proj(lat, lon)
 
@@ -232,20 +232,23 @@ if __name__ == '__main__':
 
     parser = ArgumentParser(description="Generate a path for an Aerial Lidar drone")
     parser.add_argument("path_file", metavar="INPUT", type=str, help="The original path to modify")
-    parser.add_argument("shapes", metavar="SHAPES", type=str, help="Shape file")
-    parser.add_argument("alt", metavar="ALT", type=str, help="Altitude file")
+    parser.add_argument("shapes", metavar="BARE-EARTH-SHAPES", type=str, help="Shape file for the bare earth")
+    parser.add_argument("alt", metavar="BARE-EARTH-ALT", type=str, help="Altitude file for the bare earth")
+    parser.add_argument("--canopy-shapes", type=str, help="Shape file for the canopy", required=False)
+    parser.add_argument("--canopy-alt", type=str, help="Altitude file for the canopy")
     parser.add_argument("output", metavar="OUT", type=str, help="Filepath to output the generated path to")
     parser.add_argument("buffer", metavar="buffer", type=float, help="amount of space to leave between surface and path in meters")
-    parser.add_argument("--geotiff",  type=str, help="Contains the geotiff to generate the files from",  required=False)
+    parser.add_argument("--bare-earth-geotiff",  type=str, help="Contains the geotiff to generate the files from",  required=False)
+    parser.add_argument("--canopy-geotiff",  type=str, help="Contains the geotiff to generate the files from",  required=False)
 
     args = parser.parse_args()
 
     miss_waypoints, proj = read_init_path(args.path_file)
 
-    if args.geotiff:
+    if args.bare_earth_geotiff:
 
         vectors = get_vector_from_raster(args.geotif)
-        shapes, alt_dict = get_shapes_from_vector(vectors)
+        be_shapes, be_alt_dict = get_shapes_from_vector(vectors)
 
         binary = dumps(MultiPolygon(shapes))
 
@@ -256,8 +259,28 @@ if __name__ == '__main__':
             json.dump(alt_dict, alt_dict_file)
 
     else:
-        shapes = load_shapefile(args.shapes)
-        alt_dict = load_altfile(args.alt)
+        be_shapes = load_shapefile(args.shapes)
+        be_alt_dict = load_altfile(args.alt)
+
+    if args.canopy_shapes and args.canopy_alt and args.canopy_geotiff:
+        vectors = get_vector_from_raster(args.geotif)
+        be_shapes, be_alt_dict = get_shapes_from_vector(vectors)
+
+        binary = dumps(MultiPolygon(shapes))
+
+        with open("gen/"+args.geotif+".shapes", "wb") as wkb_file:
+            wkb_file.write(binary)
+        
+        with open("gen/"+args.geotif+".alt.json", "w") as alt_dict_file:
+            json.dump(alt_dict, alt_dict_file)
+    elif args.canopy_shapes and args.canopy_alt:
+        be_shapes = load_shapefile(args.shapes)
+        be_alt_dict = load_altfile(args.alt)
+    elif args.canopy_shapes or args.canopy_alt:
+        print("Error: you need to pass both a canopy altitude dict and a canopy shapefile in")
+        sys.exit(-1)
+
+        
 
     tree = STRtree(shapes)
 

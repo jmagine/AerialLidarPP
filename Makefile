@@ -13,6 +13,8 @@ FLIGHTGEN=python pathplan/sitl.py 5760
 PARSEBIN=python pathplan/parse_bin.py
 REPORTGEN=python pathplan/eval_path.py
 
+.PRECIOUS: %.report $(LOGDIR)/%.flight.json $(PATHDIR)/%.path.json $(SHAPEDIR)/%.shapes $(SHAPEDIR)/%.alt.json
+
 %.report: $(TIFDIR)/%.tif $(LOGDIR)/%.flight.json $(PATHDIR)/%.path.json
 	$(REPORTGEN) $^
 
@@ -21,7 +23,7 @@ $(LOGDIR)/%.flight.json: $(PATHDIR)/%.path.json killsitl startsitl
 	$(FLIGHTGEN) $<
 	mkdir -p $(LOGDIR)/$<
 	cp logs/*.BIN $(LOGDIR)/$<
-	rm -rf logs terrain eeprom.bin
+	#rm -rf logs terrain eeprom.bin
 	$(PARSEBIN) $(LOGDIR)/$<
 
 $(PATHDIR)/%.path.json: $(ORIGDIR)/%.json $(SHAPEDIR)/%.shapes $(SHAPEDIR)/%.alt.json
@@ -31,9 +33,7 @@ $(SHAPEDIR)/%.shapes: $(TIFDIR)/%.tif
 	$(SHAPEGEN) $^ $(SHAPEDIR)
 
 $(SHAPEDIR)/%.alt.json: $(TIFDIR)/%.tif
-	$(ALTGEN) $^ $(SHAPEDIR)
-	
-
+	echo "We did it"
 
 killsitl:
 	kill -9 $(shell lsof -t -i:5760)
