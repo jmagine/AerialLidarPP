@@ -153,7 +153,107 @@ def raster_line(wp0, wp1):
     points.append([x, y])
 
   return points
+
+'''[smooth_line]---------------------------------------------------------------
+  Smoothes a list of point tuples by gradually changing height for sharp
+  height changes. The output should also be able to avoid the same obstacles
+  that the original path avoids.
+
+  points - original points list
+  max_height_diff - max height diff that can occur between two points
+  return - list of smoothed points
+----------------------------------------------------------------------------'''
+def smooth_line(points, max_height_diff):
+
+  #determine peaks of height list and calculate slopes to last peak
+  # start at end slope and iterate backwards,
+  #   for any slope that is greater than desired, correct heights forwards
+  print(points)
+
+  peaks = []
+  peak_inds = []
+  slopes = []
+
+  #init state
+  #last_peak = 0
+  going_up = False
+  peaks.append(points[0])
+  peak_inds.append(0)
+
+  for i in range(1, len(points) - 1):
+    z = points[i]
+    #going up
+    if z > points[i - 1]:
+      #last peak is not actually peak
+      if going_up:
+        peaks.pop()
+        peak_inds.pop()
+        peaks.append(points[i])
+        peak_inds.append(i)
+        #last_peak = i
+      else:
+        going_up = True
+        peaks.append(points[i])
+        peak_inds.append(i)
+        #last_peak = i
+    #going down
+    else:
+      going_up = False
+
+  peaks.append(points[len(points) - 1])
+  peak_inds.append(len(points) - 1)
   
+  print("Peaks:", peaks)
+  print("Peak Inds:", peak_inds)
+  
+  #peaks seems pretty useless actually...
+  for i in range(1, len(peaks)):
+    slope = (peaks[i] - peaks[i - 1]) / (peak_inds[i] - peak_inds[i - 1])
+    slopes.append(slope)
+  
+  print("Slopes:", slopes)
+  
+  # smooth negative slopes
+  for i in range(len(slopes)):
+    if slopes[i] >= 0:
+      continue
+
+    peak_ind_0 = peak_inds[i]
+    peak_ind_1 = peak_inds[i + 1]
+
+    for j in range(peak_ind_0 + 1, peak_ind_1 + 1):
+      #make all points on this slope neg max_height_diff
+      if slopes[i] < max_height_diff * -1:
+        #ensure this point is still above terrain
+        if points[j - 1] - max_height_diff > points[j]:
+          points[j] = points[j - 1] - max_height_diff
+      else:
+        #ensure this point is still above terrain
+        if points[j - 1] + slopes[i] > points[j]:
+          points[j] = points[j - 1] + slopes[i]
+
+  
+  # smooth positive slopes
+  for i in reversed(range(len(slopes))):
+    if slopes[i] <= 0:
+      continue
+
+    peak_ind_0 = peak_inds[i]
+    peak_ind_1 = peak_inds[i + 1]
+    #print(peak_ind_0, peak_ind_1)
+
+    for j in reversed(range(peak_ind_0, peak_ind_1)):
+      #make all points on this slope max_height_diff
+      if slopes[i] > max_height_diff:
+        #ensure this point is still above terrain
+        if points[j + 1] + max_height_diff > points[j]:
+          points[j] = points[j + 1] + max_height_diff
+      else:
+        #ensure this point is still above terrain
+        if points[j + 1] - slopes[i] > points[j]:
+          points[j] = points[j + 1] - slopes[i]
+  
+  return points
 
 '''[read_tif]------------------------------------------------------------------
   Reads tif image into numpy array
@@ -222,14 +322,20 @@ def main():
   #[DEBUG]
   #plt.imshow(image)
   #plt.show()
-  print(image)
-  print(image.shape)
+  #print(image)
+  #print(image.shape)
 
   packed_waypoints = gen_path(image, waypoints)
-  
+  x, y, z = packed_waypoints
+  z = smooth_line(z, 0.5)
+  packed_waypoints = x, y, z
   display_path(packed_waypoints, image)
 
+  #[DEBUG]
   #print(raster_line([0,0], [1,7]))
+  #smooth_line([3, 2, 3, 4, 2, 1, 3, 2, 5], 3)
+  #print()
+  #smooth_line([0, 0, 0, 0, 0, 0, 10, 0], 3)
 
 if __name__ == '__main__':
   main()

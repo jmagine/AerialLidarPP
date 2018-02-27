@@ -8,3 +8,4 @@ eeprom.bin
 terrain/
 logs/
 .*.swp
+!images/*.tif
