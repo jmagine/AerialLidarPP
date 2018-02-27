@@ -3,3 +3,4 @@ mav.*
 *.pyc
 __pycache__
 *.tif
+!images/*.tif
