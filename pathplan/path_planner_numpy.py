@@ -15,7 +15,8 @@ from PIL import Image
 from math import hypot
 
 '''[Config vars]------------------------------------------------------------'''
-RASTER_FILE = "../images/sine-1f-20a.tif"
+#RASTER_FILE = "../images/sine-0.1f-20a.tif"
+RASTER_FILE = "../images/rand_test.tif"
 HEIGHT_TOL = 3
 PATH_SPACING = 0.5
 
@@ -213,6 +214,7 @@ def smooth_line(points, max_height_diff):
   
   print("Slopes:", slopes)
   
+  #TODO fix case: flat area followed by neg slope. Flat area not decreasing in altitude, even though slope assumes start is at start of flat area
   # smooth negative slopes
   for i in range(len(slopes)):
     if slopes[i] >= 0:
@@ -327,7 +329,7 @@ def main():
   
   packed_waypoints = gen_path(image, waypoints)
   x, y, z = packed_waypoints
-  smooth_z = smooth_line(z, 1)
+  smooth_z = smooth_line(z, 10)
   double_smooth_z = smooth_line(smooth_z, 0.5)
 
   fig = plt.figure()

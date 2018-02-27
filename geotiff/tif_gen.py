@@ -15,7 +15,7 @@ I_HEIGHT = 200
 
 OBSTACLE_HEIGHT = 5
 
-NOISY_TERRAIN = False
+NOISY_TERRAIN = True
 
 freq = 1
 amp = 20
@@ -54,11 +54,13 @@ def create_image():
   else:
     image = np.zeros((I_HEIGHT, I_WIDTH))
 
+  
   # Sine wave pattern
   from math import sqrt, sin
   for x in range(image.shape[0]):
     for y in range(image.shape[1]):
       image[y][x] += amp * sin(freq * sqrt((x - I_WIDTH / 2)**2 + (y - I_HEIGHT / 2)**2) - 1.570796) + offset_z
+  
 
   ''' 
   # Dense Diamond pattern
@@ -69,20 +71,26 @@ def create_image():
   '''
 
   '''
-  # Random squares
+  # Random trees
   from random import randint
+  from math import sqrt
 
   for i in range(1000):
     s_x = randint(-9, I_WIDTH - 1)
     s_y = randint(-9, I_HEIGHT - 1)
-    s_w = randint(3, 10)
-    s_h = randint(3, 10)
+    s_r = randint(3, 10)
     s_z = randint(3, 15)
 
-    for x in range(s_x, s_x + s_w):
-      for y in range(s_y, s_y + s_h):
+    if x >= 0 and x < I_WIDTH and y >= 0 and y < I_HEIGHT:
+      s_b = image[y][x]
+    else:
+      s_b = 0
+
+    for x in range(s_x - s_r, s_x + s_r):
+      for y in range(s_y - s_r, s_y + s_r):
         if x >= 0 and x < I_WIDTH and y >= 0 and y < I_HEIGHT:
-          image[y][x] += s_z + randint(-2, 2)
+          if sqrt((x - s_x)**2 + (y - s_y)**2) <= s_r:
+            image[y][x] = s_b + s_z + randint(-1, 1) * 0.5
   '''
 
   '''
