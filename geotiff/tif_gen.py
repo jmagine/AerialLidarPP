@@ -9,13 +9,17 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 '''[Config vars]------------------------------------------------------------'''
-FILENAME = "sine-1f-2a.tif"
+FILENAME = "../images/sine-1f-20a.tif"
 I_WIDTH = 200
 I_HEIGHT = 200
 
 OBSTACLE_HEIGHT = 5
 
 NOISY_TERRAIN = False
+
+freq = 1
+amp = 20
+offset_z = 3
 
 '''[create_image]--------------------------------------------------------------
   Creates image according to algorithm, where each value in returned array
@@ -51,14 +55,10 @@ def create_image():
     image = np.zeros((I_HEIGHT, I_WIDTH))
 
   # Sine wave pattern
-  freq = 1
-  amp = 2
-  offset_z = 3
-
   from math import sqrt, sin
   for x in range(image.shape[0]):
     for y in range(image.shape[1]):
-      image[y][x] = amp * sin(freq * sqrt((x - I_WIDTH / 2)**2 + (y - I_HEIGHT / 2)**2)) + offset_z
+      image[y][x] += amp * sin(freq * sqrt((x - I_WIDTH / 2)**2 + (y - I_HEIGHT / 2)**2) - 1.570796) + offset_z
 
   ''' 
   # Dense Diamond pattern

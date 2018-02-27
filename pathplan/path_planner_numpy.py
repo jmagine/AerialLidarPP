@@ -15,7 +15,7 @@ from PIL import Image
 from math import hypot
 
 '''[Config vars]------------------------------------------------------------'''
-RASTER_FILE = "ucsd-dsm.tif"
+RASTER_FILE = "../images/sine-1f-20a.tif"
 HEIGHT_TOL = 3
 PATH_SPACING = 0.5
 
@@ -35,7 +35,7 @@ def gen_path(surface_raster, waypoints):
   z_points = []
 
   if len(waypoints) < 2:
-    return path_points
+    return x_points, y_points, z_points
 
   for i in range(len(waypoints) - 1):
     x, y, z = gen_segment(surface_raster, waypoints[i], waypoints[i + 1])
@@ -167,8 +167,9 @@ def smooth_line(points, max_height_diff):
   #determine peaks of height list and calculate slopes to last peak
   # start at end slope and iterate backwards,
   #   for any slope that is greater than desired, correct heights forwards
-  print(points)
 
+  new_points = []
+  new_points.extend(points)
   peaks = []
   peak_inds = []
   slopes = []
@@ -196,7 +197,7 @@ def smooth_line(points, max_height_diff):
         peak_inds.append(i)
         #last_peak = i
     #going down
-    else:
+    elif z < points[i - 1]:
       going_up = False
 
   peaks.append(points[len(points) - 1])
@@ -224,17 +225,17 @@ def smooth_line(points, max_height_diff):
       #make all points on this slope neg max_height_diff
       if slopes[i] < max_height_diff * -1:
         #ensure this point is still above terrain
-        if points[j - 1] - max_height_diff > points[j]:
-          points[j] = points[j - 1] - max_height_diff
+        if new_points[j - 1] - max_height_diff > new_points[j]:
+          new_points[j] = new_points[j - 1] - max_height_diff
       else:
         #ensure this point is still above terrain
-        if points[j - 1] + slopes[i] > points[j]:
-          points[j] = points[j - 1] + slopes[i]
+        if new_points[j - 1] + slopes[i] > new_points[j]:
+          new_points[j] = new_points[j - 1] + slopes[i]
 
   
   # smooth positive slopes
   for i in reversed(range(len(slopes))):
-    if slopes[i] <= 0:
+    if slopes[i] < 0:
       continue
 
     peak_ind_0 = peak_inds[i]
@@ -245,14 +246,14 @@ def smooth_line(points, max_height_diff):
       #make all points on this slope max_height_diff
       if slopes[i] > max_height_diff:
         #ensure this point is still above terrain
-        if points[j + 1] + max_height_diff > points[j]:
-          points[j] = points[j + 1] + max_height_diff
+        if new_points[j + 1] - max_height_diff > new_points[j]:
+          new_points[j] = new_points[j + 1] - max_height_diff
       else:
         #ensure this point is still above terrain
-        if points[j + 1] - slopes[i] > points[j]:
-          points[j] = points[j + 1] - slopes[i]
+        if new_points[j + 1] - slopes[i] > new_points[j]:
+          new_points[j] = new_points[j + 1] - slopes[i]
   
-  return points
+  return new_points
 
 '''[read_tif]------------------------------------------------------------------
   Reads tif image into numpy array
@@ -321,20 +322,41 @@ def main():
   #[DEBUG]
   #plt.imshow(image)
   #plt.show()
-  #print(image)
-  #print(image.shape)
-
+  print(image)
+  print(image.shape)
+  
   packed_waypoints = gen_path(image, waypoints)
   x, y, z = packed_waypoints
-  z = smooth_line(z, 0.5)
-  packed_waypoints = x, y, z
+  smooth_z = smooth_line(z, 1)
+  double_smooth_z = smooth_line(smooth_z, 0.5)
+
+  fig = plt.figure()
+  ax = fig.add_subplot(111)
+  ax.plot(range(len(z)), z, color='r')
+  ax.plot(range(len(smooth_z)), smooth_z, color='c')
+  ax.plot(range(len(double_smooth_z)), double_smooth_z, color='g')
+  plt.show()
+  packed_waypoints = x, y, double_smooth_z
   display_path(packed_waypoints, image)
 
   #[DEBUG]
   #print(raster_line([0,0], [1,7]))
-  #smooth_line([3, 2, 3, 4, 2, 1, 3, 2, 5], 3)
-  #print()
-  #smooth_line([0, 0, 0, 0, 0, 0, 10, 0], 3)
+  #print(smooth_line([3, 2, 3, 4, 2, 1, 3, 2, 5], 3))
+  #print() 
+  
+  '''
+  print(smooth_line([0, 0, 0, 0, 0, 0, 10, 0], 3))
+
+  from math import sin
+  path = [sin(0.01 * x) for x in range(1000)]
+  smooth_path = smooth_line(path, 1)
+
+  fig = plt.figure()
+  ax = fig.add_subplot(111)
+  ax.plot(range(len(path)), path, color='r')
+  ax.plot(range(len(smooth_path)), smooth_path, color='c')
+  plt.show()
+  '''
 
 if __name__ == '__main__':
   main()
