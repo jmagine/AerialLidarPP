@@ -119,13 +119,71 @@ def get_shapes_from_vector(vectors):
 def distance(p1, p2):
     return sum(map(lambda s: (s[0] - s[1])**2, zip(p1, p2)))**.5
 
+def get_intersection_map(strtree, alt_dict, segment, buf):
+   ls = LineString(seg)
+   query_start = time.time()
+   intersecting = list(strtree.query(ls))
+   query_time += time.time() - query_start
+
+   print("R Tree query returns {0} intersections".format(len(intersecting)))
+   inter_start = time.time()
+   int_dict = {}
+   lines = []
+   for inter in intersecting:
+
+       pure_inter_start = time.time()
+       intersection = inter.intersection(ls)
+       pure_inter_time += time.time() - pure_inter_start
+
+       if not intersection.is_empty:
+          alt = alt_dict[inter.wkt]
+          int_dict[intersection.wkt] = alt + buf
+          lines.append(inter)
+
+    return lines, int_dict
+
+def smooth_segments(start, segments, seg_dict, min_change, previous=None):
+    sorted_segs = list(sorted(segments, key=lambda x: distance(start, x.coords[0])))
+    smooth_dict = {}
+    def reducer(acc, nxt):
+        curr_alt = seg_dict[acc[-1].wkt]
+        nxt_alt = seg_dict[nxt.wkt]
+        if abs(curr_alt -  nxt_alt) < min_change:
+            acc[-1] = LineString([acc[-1].coords[0], nxt.coords[-1])
+            smooth_dict[acc[-1].wkt] = max(curr_alt, nxt_alt)
+        else:
+            acc.append(nxt)
+            smooth_dict[nxt] = nxt_alt
+        return acc    
+    return reduce([sorted_segs[0]], reducer), smooth_dict
+
+def resolve_two_dicts(canopies, lines, canopy_dict, int_dict):
+    canopy = STRtree(list(canopies))
+    new_dict = {}
+    new_segs = []
+    for line in lines:
+       queried = canopy.query(line)
+       
+       for inter in queried:
+           intersection = inter.intersection(ls)
+
+           if not intersection.is_empty:
+              alt1 = canopy_dict[inter.wkt]
+              alt2 = int_dict[line.wkt]
+              int_dict[intersection.wkt] = max(alt1, alt2)
+              new_segs.append(intersection)
+
+    return new_segs, new_dict
+        
+
+   
 
 # Args:
 #   path: (latitude, longitude) tuples
 #   strtree: STRtree containing the topology of the area to explore
 #   alt_dict: dict mapping shapely wkt to altitude
 #   buffer: number representing how close we need to be to intersect
-def plan_path(path, strtree, alt_dict, buffer):
+def plan_path(path, strtree, alt_dict, be_buffer, obs_buffer, min_alt_change, climb_rate, cruise_speed, min_speed, canopy_strtree=None, canopy_alt_dict=None):
     segments = []
     for i in range(1, len(path)):
         segments.append((path[i-1], path[i]))
@@ -141,49 +199,24 @@ def plan_path(path, strtree, alt_dict, buffer):
     intersection_time = 0
     pure_inter_time = 0
 
+    last_seg = None
+
     for seg in segments:
-        seg_points = []
-        init_time = time.time()
         print("Started Segment")
-        ls = LineString(seg)
-        query_start = time.time()
-        intersecting = list(strtree.query(ls))
-        query_time += time.time() - query_start
+        init_time = time.time()
+        int_dict, lines = get_intersection_map(strtree, alt_dict, seg)
 
-        print("R Tree query returns {0} intersections".format(len(intersecting)))
-        inter_start = time.time()
-        for inter in intersecting:
+        if canopy_strtree != None and canopy_alt_dict != None:
+            canopy_dict, can_lineds = get_intersection_map(canopy_strtree, canopy_alt_dict, seg)
+            int_dict, lines = resolve_two_dicts(can_lines, lines, canopy_dict, int_dict) 
 
-            pure_inter_start = time.time()
-            intersection = inter.intersection(ls)
-            pure_inter_time += time.time() - pure_inter_start
-  
-            if not intersection.is_empty:
-                for coord in intersection.coords:
-                    alt = alt_dict[inter.wkt]
-                    #d_x =  seg[0][0] - coord[0] 
-                    #d_y =  seg[0][1] - coord[1]
-                    #norm = (d_x**2 + d_y**2)**.5
-                    #d_x = buffer * (d_x / norm)
-                    #d_y = buffer * (d_y / norm)
-                    d_x = 0
-                    d_y = 0
+        lines, smooth_dict = smooth_segments(seg[0], lines, int_dict, min_alt_change, last_seg[0])
 
-                    seg_points.append((coord[0] + d_x, coord[1] + d_y, alt + buffer))
-
-        intersection_time += time.time() - inter_start 
-        sort_start = time.time()
-        seg_points = list(sorted(seg_points, key=lambda x: distance(seg[0], x)))
-        sorting_time += time.time() - sort_start
-
-        new_path.extend(seg_points)
-        this_seg = time.time() - init_time
-        print("Finished Segment in {0}".format(this_seg))
-
-    print("Total sorting time {0}".format(sorting_time))
-    print("Total intersection time {0}".format(intersection_time))
-    print("Total pure intersection time {0}".format(pure_inter_time))
-    print("Total query time {0}".format(query_time))
+        #d_x =  seg[0][0] - coord[0] 
+        #d_y =  seg[0][1] - coord[1]
+        #norm = (d_x**2 + d_y**2)**.5
+        #d_x = buffer * (d_x / norm)
+        #d_y = buffer * (d_y / norm)
 
     return new_path
 
@@ -252,38 +285,45 @@ if __name__ == '__main__':
 
         binary = dumps(MultiPolygon(shapes))
 
-        with open("gen/"+args.geotif+".shapes", "wb") as wkb_file:
+        with open("gen/"+args.bare_earth_geotiff+".shapes", "wb") as wkb_file:
             wkb_file.write(binary)
         
-        with open("gen/"+args.geotif+".alt.json", "w") as alt_dict_file:
+        with open("gen/"+args.bare_earth_geotiff+".alt.json", "w") as alt_dict_file:
             json.dump(alt_dict, alt_dict_file)
 
     else:
         be_shapes = load_shapefile(args.shapes)
         be_alt_dict = load_altfile(args.alt)
 
+    canopy_tree = None
+    canopy_shapes = None
+    canopy_alt_dict = None
+
     if args.canopy_shapes and args.canopy_alt and args.canopy_geotiff:
-        vectors = get_vector_from_raster(args.geotif)
-        be_shapes, be_alt_dict = get_shapes_from_vector(vectors)
+        vectors = get_vector_from_raster(args.canopy_geotiff)
+        can_shapes, can_alt_dict = get_shapes_from_vector(vectors)
 
-        binary = dumps(MultiPolygon(shapes))
+        binary = dumps(MultiPolygon(can_shapes))
 
-        with open("gen/"+args.geotif+".shapes", "wb") as wkb_file:
+        with open("gen/"+args.canopy_geotiff+".shapes", "wb") as wkb_file:
             wkb_file.write(binary)
         
-        with open("gen/"+args.geotif+".alt.json", "w") as alt_dict_file:
+        with open("gen/"+args.canopy_geotiff+".alt.json", "w") as alt_dict_file:
             json.dump(alt_dict, alt_dict_file)
     elif args.canopy_shapes and args.canopy_alt:
-        be_shapes = load_shapefile(args.shapes)
-        be_alt_dict = load_altfile(args.alt)
+        can_shapes = load_shapefile(args.shapes)
+        can_alt_dict = load_altfile(args.alt)
     elif args.canopy_shapes or args.canopy_alt:
         print("Error: you need to pass both a canopy altitude dict and a canopy shapefile in")
         sys.exit(-1)
 
-        
+    if canopy_shapes != None:
+        canopy_tree = STRtree(canopy_shapes)        
 
-    tree = STRtree(shapes)
+    be_tree = STRtree(shapes)
 
-    new_path = plan_path(miss_waypoints, tree, alt_dict, args.buffer)
+    
+
+    new_path = plan_path(miss_waypoints, tree, alt_dict, args.buffer, canopy_tree, canopy_alt_dict)
 
     save_path(args.output, new_path, proj)
