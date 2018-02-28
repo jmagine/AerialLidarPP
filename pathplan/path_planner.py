@@ -92,7 +92,7 @@ def get_vector_from_raster(rasterfile):
     return list(results)
 
 
-def get_shapes_from_vector(vectors):
+def get_shapes_from_vector(vectors, do_transform=True):
     alt_dict = {}
     shapes = []
 
@@ -106,7 +106,9 @@ def get_shapes_from_vector(vectors):
 
     init_time = time.time()
     for vec in vectors:
-        shap = transform(transform_to_proj, shape(vec['geometry']))
+        shap = shape(vec['geometry'])
+        if do_transform:
+            shap = transform(transform_to_proj, shap)
         alt_dict[shap.wkt] = vec['properties']['raster_val']
         shapes.append(shap)
 
@@ -117,45 +119,51 @@ def get_shapes_from_vector(vectors):
 
 
 def distance(p1, p2):
-    return sum(map(lambda s: (s[0] - s[1])**2, zip(p1, p2)))**.5
+    return ((p1[0]-p2[0])**2 + (p1[1]-p2[1])**2)**.5
 
 def get_intersection_map(strtree, alt_dict, segment, buf):
-   ls = LineString(seg)
-   query_start = time.time()
-   intersecting = list(strtree.query(ls))
-   query_time += time.time() - query_start
-
-   print("R Tree query returns {0} intersections".format(len(intersecting)))
-   inter_start = time.time()
-   int_dict = {}
-   lines = []
-   for inter in intersecting:
-
-       pure_inter_start = time.time()
-       intersection = inter.intersection(ls)
-       pure_inter_time += time.time() - pure_inter_start
-
-       if not intersection.is_empty:
-          alt = alt_dict[inter.wkt]
-          int_dict[intersection.wkt] = alt + buf
-          lines.append(inter)
-
+    ls = LineString(segment)
+    query_start = time.time()
+    intersecting = list(strtree.query(ls))
+    #query_time += time.time() - query_start
+ 
+    print("R Tree query returns {0} intersections".format(len(intersecting)))
+    inter_start = time.time()
+    int_dict = {}
+    lines = []
+    for inter in intersecting:
+ 
+        pure_inter_start = time.time()
+        intersection = inter.intersection(ls)
+        #pure_inter_time += time.time() - pure_inter_start
+ 
+        if not intersection.is_empty:
+           alt = alt_dict[inter.wkt]
+           int_dict[intersection.wkt] = alt + buf
+           lines.append(intersection)
+ 
     return lines, int_dict
 
-def smooth_segments(start, segments, seg_dict, min_change, previous=None):
+def smooth_segments(start, segments, seg_dict, min_change):
     sorted_segs = list(sorted(segments, key=lambda x: distance(start, x.coords[0])))
-    smooth_dict = {}
+    smooth_dict = dict(seg_dict)
+
+    #This is dumb
     def reducer(acc, nxt):
-        curr_alt = seg_dict[acc[-1].wkt]
-        nxt_alt = seg_dict[nxt.wkt]
+        curr_alt = smooth_dict[acc[-1].wkt]
+        nxt_alt = smooth_dict[nxt.wkt]
         if abs(curr_alt -  nxt_alt) < min_change:
-            acc[-1] = LineString([acc[-1].coords[0], nxt.coords[-1])
+            
+            del smooth_dict[acc[-1].wkt]
+
+            acc[-1] = LineString([acc[-1].coords[0], nxt.coords[-1]])
             smooth_dict[acc[-1].wkt] = max(curr_alt, nxt_alt)
         else:
             acc.append(nxt)
-            smooth_dict[nxt] = nxt_alt
+            smooth_dict[nxt.wkt] = nxt_alt
         return acc    
-    return reduce([sorted_segs[0]], reducer), smooth_dict
+
+    return reduce(reducer, sorted_segs[1:], [sorted_segs[0]]), smooth_dict
 
 def resolve_two_dicts(canopies, lines, canopy_dict, int_dict):
     canopy = STRtree(list(canopies))
@@ -183,8 +191,9 @@ def resolve_two_dicts(canopies, lines, canopy_dict, int_dict):
 #   strtree: STRtree containing the topology of the area to explore
 #   alt_dict: dict mapping shapely wkt to altitude
 #   buffer: number representing how close we need to be to intersect
-def plan_path(path, strtree, alt_dict, be_buffer, obs_buffer, min_alt_change, climb_rate, cruise_speed, min_speed, canopy_strtree=None, canopy_alt_dict=None):
+def plan_path(path, strtree, alt_dict, be_buffer, obs_buffer, min_alt_change, climb_rate, descent_rate, max_speed, canopy_strtree=None, canopy_alt_dict=None):
     segments = []
+    print(path)
     for i in range(1, len(path)):
         segments.append((path[i-1], path[i]))
 
@@ -201,24 +210,124 @@ def plan_path(path, strtree, alt_dict, be_buffer, obs_buffer, min_alt_change, cl
 
     last_seg = None
 
+    obs_for_graph = []
+
+    super_int_dict = {}
+
     for seg in segments:
         print("Started Segment")
         init_time = time.time()
-        int_dict, lines = get_intersection_map(strtree, alt_dict, seg)
+        lines, int_dict = get_intersection_map(strtree, alt_dict, seg, be_buffer)
+
+        for (key, val) in int_dict.items():
+            super_int_dict[key] = val
 
         if canopy_strtree != None and canopy_alt_dict != None:
-            canopy_dict, can_lineds = get_intersection_map(canopy_strtree, canopy_alt_dict, seg)
+            canopy_dict, can_lineds = get_intersection_map(canopy_strtree, canopy_alt_dict, seg, canopy_buffer)
             int_dict, lines = resolve_two_dicts(can_lines, lines, canopy_dict, int_dict) 
 
-        lines, smooth_dict = smooth_segments(seg[0], lines, int_dict, min_alt_change, last_seg[0])
+        obs_for_graph.extend(list(sorted(lines, key=lambda x:distance(seg[0], x.coords[0]))))
+        lines, smooth_dict = smooth_segments(seg[0], lines, int_dict, min_alt_change)
 
-        #d_x =  seg[0][0] - coord[0] 
-        #d_y =  seg[0][1] - coord[1]
-        #norm = (d_x**2 + d_y**2)**.5
-        #d_x = buffer * (d_x / norm)
-        #d_y = buffer * (d_y / norm)
+        points = [(lines[0].coords[0][0], lines[0].coords[0][1], smooth_dict[lines[0].wkt], max_speed)]
+        for i in range(1,len(lines)):
+            prev = lines[i-1]
+            curr = lines[i]
+            last_alt = smooth_dict[prev.wkt]
+            curr_alt = smooth_dict[curr.wkt]
+            horiz = calculate_horiz_dist(curr_alt, last_alt, climb_rate, descent_rate, max_speed)
 
-    return new_path
+            mid = prev.coords[1]
+
+            speed = max_speed
+            if last_alt > curr_alt:
+                #We need to descent, so we project at the curr altitude
+                other = curr.coords[1]
+                dx, dy = vec_sub(other, mid) 
+
+                projected = vec_add(mid, (horiz * dx, horiz * dy))
+
+
+                if horiz > curr.length:
+                    horiz = curr.length 
+                    speed = horiz / (abs(last_alt - curr_alt) / descent_rate )
+
+                points.append((mid[0], mid[1], last_alt, speed))
+                points.append((projected[0], projected[1], curr_alt, max_speed))
+            else:
+                #We need to ascend, so we project at the last altitude
+                other = prev.coords[0]
+                dx, dy = vec_sub(other, mid) 
+                projected = vec_add(mid, (horiz* dx, horiz* dy))
+
+                if horiz > prev.length:
+                    horiz = prev.length 
+                    speed = horiz / (abs(last_alt - curr_alt) / descent_rate )
+
+                points.append((projected[0], projected[1], last_alt, speed))
+                points.append((mid[0], mid[1], curr_alt, max_speed))
+
+        last_alt = smooth_dict[lines[-1].wkt]
+        points.append((lines[-1].coords[1][0], lines[-1].coords[1][1], last_alt, max_speed))
+        new_path.extend(points)
+
+    new_obs = []
+    for line in obs_for_graph:
+        new_obs.append(tuple(list(line.coords[0]) + [super_int_dict[line.wkt]]))
+        new_obs.append(tuple(list(line.coords[1]) + [super_int_dict[line.wkt]]))
+    print(new_path)
+    return new_path, new_obs
+
+def vec_sub(first, second):
+    dx = first[0] - second[0]
+    dy = first[1] - second[1]
+
+    norm = (dx**2 + dy**2)**.5
+
+    return dx / norm, dy / norm
+
+def vec_add(first, second):
+    dx = first[0] + second[0]
+    dy = first[1] + second[1]
+
+    return dx, dy
+
+def calculate_horiz_dist(alt, last_alt, climb_rate, descent_rate, min_speed):
+    d_alt = last_alt - alt
+
+    if d_alt < 0:
+        d_time = abs(d_alt) / climb_rate
+    else:
+        d_time = abs(d_alt) / descent_rate
+    
+    horiz_dist = min_speed * d_time
+
+    return horiz_dist
+
+def generate_points(line, alt, climb_rate, descent_rate, min_speed, last_start):
+    if last_start == None:
+        return [(line.coords[0][0], line.coords[0][1], alt)] 
+
+    d_alt = last_start[2] - alt
+
+    if d_alt < 0:
+        d_time = d_alt / climb_rate
+    else:
+        d_time = d_alt / descent_rate
+    
+    horiz_dist = min_speed * d_time
+
+    d_x =  lines.coords[0][0] - last_start[0]
+    d_y =  lines.coords[0][1] - last_start[1]
+    norm = (d_x**2 + d_y**2)**.5
+    d_x = horiz_dist * (d_x / norm)
+    d_y = horiz_dist * (d_y / norm)
+
+    
+
+    
+    
+    
 
 def read_init_path(filepath):
     miss_dict = json.load(open(filepath))
@@ -247,10 +356,10 @@ def display_path(path, shapes, alt_dict):
 #Also does projection
 def save_path(filepath, path, proj):
     arr = []
-    for lon, lat, alt in path:
+    for lon, lat, alt, speed in path:
         if proj != None:
             lon, lat, alt = pyproj.transform(proj, wgs84, lon, lat, alt)
-        new_dict = {'latitude' : lat, 'longitude' : lon, 'altitude' : alt}
+        new_dict = {'latitude' : lat, 'longitude' : lon, 'altitude' : alt, 'speed':speed}
         arr.append(new_dict)
 
     json.dump(arr, open(filepath, 'w'))
@@ -320,10 +429,10 @@ if __name__ == '__main__':
     if canopy_shapes != None:
         canopy_tree = STRtree(canopy_shapes)        
 
-    be_tree = STRtree(shapes)
+    be_tree = STRtree(be_shapes)
 
     
 
-    new_path = plan_path(miss_waypoints, tree, alt_dict, args.buffer, canopy_tree, canopy_alt_dict)
+    new_path = plan_path(miss_waypoints, be_tree, be_alt_dict, args.buffer, 0, 2, 10,10, 10, 10, canopy_tree, canopy_alt_dict)
 
     save_path(args.output, new_path, proj)

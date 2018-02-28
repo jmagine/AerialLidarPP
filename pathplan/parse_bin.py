@@ -45,6 +45,18 @@ def load_path_from_bin(filename):
     gps_points = [{'latitude':x['Lat'],'longitude':x['Lng'], 'altitude':x['Alt']}  for x in parsed_log if x['mavpackettype'] == 'GPS']
     return gps_points
 
+def parse_bins(logs):
+    def key_fun(filename):
+        return int(os.path.splitext(os.path.basename(filename))[0])
+
+    files = list(sorted(glob.glob(logs+"/*.BIN"), key=key_fun))
+    
+    for binfile in files:
+        new_path = load_path_from_bin(binfile)
+        path.extend(new_path)
+
+    return new_path
+
 if __name__ == '__main__':
     from argparse import ArgumentParser
     import os
