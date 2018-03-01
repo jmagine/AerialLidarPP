@@ -16,8 +16,8 @@ from math import hypot
 from utils import plot_path, read_tif
 
 '''[Config vars]------------------------------------------------------------'''
-#RASTER_FILE = "../images/sine-0.1f-20a.tif"
-RASTER_FILE = "../images/rand_test.tif"
+#RASTER_FILE = "../tests/images/sine-0.1f-20a.tif"
+RASTER_FILE = "../tests/images/ucsd-dsm.tif"
 HEIGHT_TOL = 3
 PATH_SPACING = 0.5
 
@@ -308,15 +308,54 @@ def display_path(packed_waypoints, image, small=True):
   
   plt.show()
 
+from path_planner import distance
+def build_x_lists(x, y, z):
+    tups = zip(x, y, z)
+    xs = [0]
+    last = tups[0]
+    acc_dist = 0
+    for tup in tups[1:]:
+        acc_dist += distance(last, tup)
+        xs.append(acc_dist)
+        last = tup 
+    return xs
+    
+
 '''[main]----------------------------------------------------------------------
   Drives program, reads image in, uses waypoints to generate path, and writes
   path to json file.
 ----------------------------------------------------------------------------'''
+import rasterio
+from path_planner import wgs84, read_init_path
+import pyproj
+
+def get_image_coord(raster, x, y):
+  box = raster.bounds()
+  width = box.right - box.left
+  height = box.top -box.bottom
+  x_perc = x / width
+  y_perc = y / height
+  
+  return x_perc * raster.width, y_perc * raster.height
+  
+
+from affine import Affine
 def main():
   image = read_tif(RASTER_FILE)
 
+  raster = rasterio.open(RASTER_FILE)
+
+  raster_proj = pyproj.Proj(raster.crs)
+
   #[TODO] read waypoints from file
-  waypoints = [(0, 0), (199, 199), (0, 199), (199, 0)]
+  waypoints = [(0,0), (199, 199), (0, 199), (199, 0)]
+
+  #points = #read_init_path('../tests/paths/ucsd-dsm.json', raster_proj)
+
+  #waypoints = []
+
+  #for point in waypoints:
+  #  waypoints.append(get_image_coord(raster, point[0], point[1]))
 
   #[TODO] possibly do some command line args
 
@@ -329,18 +368,58 @@ def main():
   print(image.shape)
   
   packed_waypoints = gen_path(image, waypoints)
+  print(packed_waypoints)
   x, y, z = packed_waypoints
+  
+  new_xs = []
+  new_ys = []
+
+  from path_planner import save_path, utm_proj
+
+  proj = utm_proj(32.884271,-117.235120)
+
+  #print(raster.transform)
+  #aff = Affine(*raster.transform)
+  #for tup in zip(y, x):
+  #  lon, lat =  aff * tup
+  #  print("lat, lon", lat, lon)
+  #  x1, y1 = pyproj.transform(wgs84, proj, lon, lat)
+  #  new_xs.append(x1)
+  #  new_ys.append(y1)
+
+  #x = new_xs
+  #y = new_ys
+
   smooth_z = smooth_line(z, 10)
   double_smooth_z = smooth_line(smooth_z, 0.5)
 
+  from plots import plot2d
   fig = plt.figure()
   ax = fig.add_subplot(111)
-  ax.plot(range(len(z)), z, color='r')
-  ax.plot(range(len(smooth_z)), smooth_z, color='c')
-  ax.plot(range(len(double_smooth_z)), double_smooth_z, color='g')
+  
+  ax.plot(build_x_lists(x, y, z), smooth_z, label='single-smoothe', color='c')
+  ax.plot(build_x_lists(x, y, z), z, label='no smoothing', color='r')
+  ax.set_xlabel("Distance along path (ft)")
+  ax.set_ylabel("Altitude")
+  plt.legend(loc='bottom right')
+  plt.show()
+
+  fig = plt.figure()
+  ax = fig.add_subplot(111)
+  ax.plot(build_x_lists(x, y, z), z, label='no smoothing', color='r')
+  ax.plot(build_x_lists(x, y, z), double_smooth_z, label='double smoothe', color='g')
+  ax.set_xlabel("Distance along path (ft)")
+  ax.set_ylabel("Altitude")
+  plt.legend(loc='bottom right')
   plt.show()
   packed_waypoints = x, y, double_smooth_z
   display_path(packed_waypoints, image)
+
+
+
+  #save_path("ucsd-gen.json", zip(x, y, z), proj)
+  #save_path("ucsd-gen-smooth.json", zip(x, y, smooth_z), proj)
+  #save_path("ucsd-gen-double-smooth.json", zip(x, y, double_smooth_z), proj)
 
   #[DEBUG]
   #print(raster_line([0,0], [1,7]))
