@@ -39,4 +39,4 @@ killsitl:
 	kill -9 $(shell lsof -t -i:5760)
 
 startsitl:
-	~/.dronekit/sitl/copter-3.3/apm --wipe --home=32.884271,-117.235120,584,149 --model=quad &
+	~/.dronekit/sitl/copter-3.3/apm --wipe --home=32.884271,-117.235120,0,149 --model=quad &

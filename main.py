@@ -8,7 +8,7 @@ from shapely.wkb import dumps
 from os.path import basename, splitext
 
 from pathplan.path_planner import get_vector_from_raster,plan_path, get_shapes_from_vector, read_init_path
-import pathplan.sitl as sitl
+#import pathplan.sitl as sitl
 from pathplan.utils import load_shapefile, load_altfile
 
 
@@ -91,10 +91,11 @@ def plot_2d_all(case_name):
     
     paths = []
 
-    for (name,res) in test_dict['results']:
-        paths.append((name, [res['path']])) 
+    for (name,res) in test_dict['results'].iteritems():
+        if name != 'lines': 
+            paths.append((name, res['path'])) 
 
-    lines = test_dict['results']['lines']
+    lines = ('surface',test_dict['results']['lines'])
 
     plot2d(lines, *paths)
     
@@ -156,7 +157,7 @@ if __name__ == '__main__':
                 continue
             elif command[0] == 'plot-all-2d':
                 if len(command) == 2:
-                    plot_2d_all(*command[1])
+                    plot_2d_all(command[1])
                 else:
                     print("Error incorrect # of args")
                     print_commands()

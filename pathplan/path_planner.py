@@ -220,7 +220,7 @@ def plan_path(path, strtree, alt_dict, be_buffer, obs_buffer, min_alt_change, cl
         lines, int_dict = get_intersection_map(strtree, alt_dict, seg, be_buffer)
 
         for (key, val) in int_dict.items():
-            super_int_dict[key] = val
+            super_int_dict[key] = val - be_buffer
 
         if canopy_strtree != None and canopy_alt_dict != None:
             canopy_dict, can_lineds = get_intersection_map(canopy_strtree, canopy_alt_dict, seg, canopy_buffer)
@@ -236,6 +236,8 @@ def plan_path(path, strtree, alt_dict, be_buffer, obs_buffer, min_alt_change, cl
             last_alt = smooth_dict[prev.wkt]
             curr_alt = smooth_dict[curr.wkt]
             horiz = calculate_horiz_dist(curr_alt, last_alt, climb_rate, descent_rate, max_speed)
+
+            print horiz
 
             mid = prev.coords[1]
 
@@ -273,8 +275,8 @@ def plan_path(path, strtree, alt_dict, be_buffer, obs_buffer, min_alt_change, cl
 
     new_obs = []
     for line in obs_for_graph:
-        new_obs.append(tuple(list(line.coords[0]) + [super_int_dict[line.wkt]]))
-        new_obs.append(tuple(list(line.coords[1]) + [super_int_dict[line.wkt]]))
+        new_obs.append((line.coords[0][0], line.coords[0][1], super_int_dict[line.wkt]))
+        new_obs.append((line.coords[1][0], line.coords[1][1], super_int_dict[line.wkt]))
     print(new_path)
     return new_path, new_obs
 
@@ -329,10 +331,8 @@ def generate_points(line, alt, climb_rate, descent_rate, min_speed, last_start):
     
     
 
-def read_init_path(filepath):
+def read_init_path(filepath, proj=None):
     miss_dict = json.load(open(filepath))
-
-    proj = None
 
     tups = []
     for wp in miss_dict:
@@ -340,6 +340,8 @@ def read_init_path(filepath):
             proj = utm_proj(wp['latitude'], wp['longitude'])
 
         coord = pyproj.transform(wgs84, proj, wp['longitude'], wp['latitude'],0)
+        if 'altitude' in wp:
+            coord = (coord[0], coord[1], wp['altitude'] * 3.28084)
         tups.append(coord)
 
     return tups, proj
@@ -356,10 +358,10 @@ def display_path(path, shapes, alt_dict):
 #Also does projection
 def save_path(filepath, path, proj):
     arr = []
-    for lon, lat, alt, speed in path:
+    for lon, lat, alt in path:
         if proj != None:
             lon, lat, alt = pyproj.transform(proj, wgs84, lon, lat, alt)
-        new_dict = {'latitude' : lat, 'longitude' : lon, 'altitude' : alt, 'speed':speed}
+        new_dict = {'latitude' : lat, 'longitude' : lon, 'altitude' : alt * .3048, 'speed':0}
         arr.append(new_dict)
 
     json.dump(arr, open(filepath, 'w'))
