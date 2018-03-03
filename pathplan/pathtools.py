@@ -37,6 +37,10 @@ def read_path_from_json(filepath):
 def default_noise(val=0):
     return val + np.random.normal(0, 1.5)
 
+def gen_noise_points_static(waypoints, noise=lambda x: x + np.random.normal(0, 0.00005)):
+    for pt in map(np.array, waypoints):
+        yield pt + noise(0)
+
 def gen_noise_points(waypoints, noise=default_noise):
     # For each point in waypoints, generate a new line perpendicular to it
     # using point[i] and point[i+1] as the line. Having this line, select
@@ -64,14 +68,8 @@ def gen_points_perpendicular(waypoints, noise=default_noise):
 
     for pt in waypoints:
         yield pt + 0.0001
-        # line = pt - past
-        # perpendicular = np.cross(line, UP)
-        # yield perpendicular * 5 + past
-        # past = pt
 
-    # yield past
-
-def gen_noise_points_from_file(filepath):
+def gen_noise_points_staticfrom_file(filepath):
     waypoints = read_path_from_json(filepath)
     return gen_noise_points(waypoints)
 
@@ -126,26 +124,27 @@ def display_surface(waypoints, noise_pts):
 
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    ax.plot(x1, y1, z1, 'k-', linewidth=3.0, color='b')
-    ax.plot(x2, y2, z2, 'k-', linewidth=3.0, color='m')
+    ax.plot(x1, y1, z1, 'k-', linewidth=0.3, color='b')
+    ax.plot(x2, y2, z2, 'k-', linewidth=0.3, color='m')
     ax.plot_surface(X, Y, Z, color='r', alpha=0.4, linewidth=0)
 
     plt.show()
 
 def display_surface_with_file(filepath):
     waypoints = list(read_path_from_json(filepath))
-    noise_pts = list(gen_points_perpendicular(waypoints))
+    noise_pts = list(gen_noise_points_static(waypoints))
+
     display_surface(waypoints, noise_pts)
 
 
 def main():
-    err = calc_errors_with_gen_noise("path.json", metric=mse)
+    err = calc_errors_with_gen_noise("output/path.json", metric=mse)
     print("MSE={}".format(err))
 
     # display_gen_noise_path_with_file("path.json")
-    display_surface_with_file("path.json")
+    display_surface_with_file("output/path.json")
 
 
 # Uncomment to test
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()
