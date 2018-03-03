@@ -29,13 +29,13 @@ for cmd in mission:
     lat = cmd['latitude']
     lon = cmd['longitude']
     alt = cmd['altitude']
-    nav_type = cmd['type']
-    if nav_type == 'takeoff':
-        nav_type = mavutil.mavlink.MAV_CMD_NAV_TAKEOFF
-    elif nav_type == 'landing':
-        nav_type = mavutil.mavlink.MAV_CMD_NAV_WAYPOINT
-    else:
-        nav_type = mavutil.mavlink.MAV_CMD_NAV_WAYPOINT
+    #nav_type = cmd['type']
+    #if nav_type == 'takeoff':
+    #    nav_type = mavutil.mavlink.MAV_CMD_NAV_TAKEOFF
+    #elif nav_type == 'landing':
+    #    nav_type = mavutil.mavlink.MAV_CMD_NAV_WAYPOINT
+    #else:
+    nav_type = mavutil.mavlink.MAV_CMD_NAV_WAYPOINT
 
     cmd = Command(0, 0, 0, mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT, nav_type, 0, 0, 0, 0, 0, 0, lat, lon, alt)
     cmds.add(cmd)
@@ -75,7 +75,7 @@ def arm_and_takeoff(aTargetAltitude):
             break
         time.sleep(1)
 
-arm_and_takeoff(30)
+arm_and_takeoff(33.865)
 
 #vehicle.commands.next=0
 
@@ -138,8 +138,8 @@ def distance_to_current_waypoint():
 while True:
     nextwaypoint=vehicle.commands.next
     print('Distance to waypoint (%s): %s' % (nextwaypoint, distance_to_current_waypoint()))
-    if nextwaypoint==5: #Dummy waypoint - as soon as we reach waypoint 4 this is true and we exit.
-        print("Exit 'standard' mission when start heading to final waypoint (5)")
+    if nextwaypoint == len(mission)-1: 
+        print("Exit 'standard' mission when start heading to final waypoint ({0})".format(len(mission)))
         break;
     time.sleep(1)
 
@@ -165,5 +165,3 @@ def save_mission(aFileName):
     with open(aFileName, 'w') as file_:
         print(" Write mission to file")
         file_.write(output)
-
-save_mission("test_mission.txt")
