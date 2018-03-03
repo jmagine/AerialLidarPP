@@ -36,7 +36,11 @@ def read_path_from_json(filepath):
     Returns:
         A generator containing all parsed data points (x=lon, y=lat, z=alt)
     """
-    to_xyz = lambda pt: (pt['longitude'], pt['latitude'], pt['altitude'])
+    X = "longitude"
+    Y = "latitude"
+    Z = "altitude"
+
+    to_xyz = lambda pt: np.array([pt[X], pt[Y], pt[Z]])
     points = json.load(open(filepath))
     return map(to_xyz, points)
 
@@ -48,8 +52,10 @@ def gen_noise_points_static(waypoints, noise=lambda x: x + np.random.normal(0, 0
     Generates a new path by adding a static noise to all points in the
     original path; which is done via generator. This is the current
     preferred way to generate noisy points from our planned path.
+    Args:
+        waypoints - a list of waypoints with each point a np-array
     """
-    for pt in map(np.array, waypoints):
+    for pt in waypoints:
         yield pt + noise(0)
 
 def gen_noise_points(waypoints, noise=default_noise):
@@ -99,6 +105,11 @@ def calc_errors_with_gen_noise(filepath, metric=mse):
 
 
 def display_gen_noise_path(waypoints, noise_pts):
+    """
+    Args:
+        path_one - List of waypoints in format [(x, y, z), (x, y, z), ...]
+        path_two - List of waypoints in format [(x, y, z), (x, y, z), ...]
+    """
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
     ax.plot(*np.array(waypoints).T, marker='o', color='b')
@@ -161,5 +172,5 @@ def main():
 
 
 # Uncomment to test
-# if __name__ == "__main__":
-#     main()
+if __name__ == "__main__":
+    main()
