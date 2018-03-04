@@ -9,3 +9,4 @@ terrain/
 logs/
 .*.swp
 !images/*.tif
+*.json
