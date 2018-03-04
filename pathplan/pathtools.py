@@ -79,8 +79,18 @@ def gen_noise_points(waypoints, noise=default_noise):
     yield past_point
 
 
+def norm(vec):
+    return np.linalg.norm(vec)
 
+def get_dist_between_points(points, scale=1):
+    prev = None
+    for pt in points:
+        if prev is not None:
+            yield norm(pt - prev) * scale
+        prev = pt
 
+def total_dist(path):
+    return sum(get_dist_between_points(path))
 
 def mse(expected, actual):
     """
@@ -101,10 +111,15 @@ def calc_errors_with_gen_noise(filepath, metric=mse):
     noise_pts = list(gen_noise_points(waypoints))
     return metric(expected=waypoints, actual=noise_pts)
 
+def print_planned_and_flown_path_debug_info(planned, flown, metric=mse):
+    print(f"Path Debug:")
+    print(f"  len(planned) = {len(planned)}")
+    print(f"  len(flown)   = {len(flown)}")
+    print(f"  Total distance traveled for planned path: {total_dist(planned)}")
+    print(f"  Total distance traveled for flown path: {total_dist(planned)}")
+    print(f"  Error based on metric = {metric(planned, flown)}")
 
-
-
-def display_gen_noise_path(waypoints, noise_pts):
+def display_two_paths(one, two):
     """
     Args:
         path_one - List of waypoints in format [(x, y, z), (x, y, z), ...]
@@ -112,14 +127,14 @@ def display_gen_noise_path(waypoints, noise_pts):
     """
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    ax.plot(*np.array(waypoints).T, marker='o', color='b')
-    ax.plot(*np.array(noise_pts).T, marker='o', color='r')
+    ax.plot(*np.array(one).T, 'k-', color='b', linewidth=1.0)
+    ax.plot(*np.array(two).T, 'k-', color='r', linewidth=1.0)
     plt.show()
 
 def display_gen_noise_path_with_file(filepath):
     waypoints = list(read_path_from_json(filepath))
     noise_pts = list(gen_noise_points(waypoints))
-    display_gen_noise_path(waypoints, noise_pts)
+    display_two_paths(waypoints, noise_pts)
 
 def display_surface(path_one, path_two):
     """
@@ -170,7 +185,6 @@ def main():
     # display_gen_noise_path_with_file("path.json")
     display_surface_with_file("output/path.json")
 
-
 # Uncomment to test
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()
