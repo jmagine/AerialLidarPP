@@ -1,41 +1,32 @@
 import json
-from shapely.wkb import loads
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-from matplotlib import cm
-from PIL import Image
+import pyproj
+from pathplan.geo import utm_proj, wgs84
 
-import numpy as np
+def distance(p1, p2):
+    return ((p1[0]-p2[0])**2 + (p1[1]-p2[1])**2)**.5
 
+def read_init_path(filepath, proj=None):
+    miss_dict = json.load(open(filepath))
 
-def load_shapefile(filename):
-    with open(filename, "rb") as wkb_file:
-        shapes = list(loads(wkb_file.read()))
-    return shapes
+    tups = []
+    for wp in miss_dict:
+        if proj == None:
+            proj = utm_proj(wp['latitude'], wp['longitude'])
 
-def load_altfile(filename):
-    with open(filename) as alt_dict_file:
-        alt_dict = json.load(alt_dict_file)
-    return alt_dict
+        coord = pyproj.transform(wgs84, proj, wp['longitude'], wp['latitude'],0)
+        if 'altitude' in wp:
+            coord = (coord[0], coord[1], wp['altitude'] * 3.28084)
+        tups.append(coord)
 
-def read_tif(filename):
-  #image = Image.open(filename)
-  #image = np.array(image)
-  #image = plt.imread(filename)
-  #i_w = image.shape[0]
-  #i_h = image.shape[1]
-  #image = image.flatten().reshape((i_w, i_h))
-  image = Image.open(filename).convert('L')
-  image = np.array(image)
-  return image
+    return tups, proj
 
-def plot_path(image, x_points, y_points, z_points):
-  x_raster = np.arange(0, image.shape[0], step=1)
-  y_raster = np.arange(0, image.shape[1], step=1)
-  x_raster, y_raster = np.meshgrid(x_raster, y_raster)
+#Also does projection
+def save_path(filepath, path, proj):
+    arr = []
+    for lon, lat, alt, speed in path:
+        if proj != None:
+            lon, lat, alt = pyproj.transform(proj, wgs84, lon, lat, alt)
+        new_dict = {'latitude' : lat, 'longitude' : lon, 'altitude' : alt * .3048, 'speed':speed}
+        arr.append(new_dict)
 
-  fig = plt.figure()
-  ax = fig.add_subplot(111, projection='3d')
-  ax.plot(x_points, y_points, zs=z_points)
-  ax.plot_surface(y_raster, x_raster, image, cmap=cm.coolwarm,linewidth=0, antialiased=False)
-  plt.show()
+    json.dump(arr, open(filepath, 'w'))

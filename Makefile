@@ -38,5 +38,5 @@ $(SHAPEDIR)/%.alt.json: $(TIFDIR)/%.tif
 killsitl:
 	kill -9 $(shell lsof -t -i:5760)
 
-startsitl:
+runsitl:
 	~/.dronekit/sitl/copter-3.3/apm --wipe --home=32.884271,-117.235120,0,149 --model=quad &

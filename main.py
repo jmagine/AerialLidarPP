@@ -1,29 +1,33 @@
 #WELCOME TO THE MASTER VIZ/EVALUATION SCRIPT
 import subprocess
+import traceback
 from shapely.strtree import STRtree
 import json
-from pathplan.path_planner_numpy import read_tif
 from shapely.geometry import MultiPolygon
 from shapely.wkb import dumps
 from os.path import basename, splitext
 
-from pathplan.path_planner import get_vector_from_raster,plan_path, get_shapes_from_vector, read_init_path
-#import pathplan.sitl as sitl
-from pathplan.utils import load_shapefile, load_altfile
+from pathplan.geo import vectorize_raster, shapelify_vector, read_tif, load_shapefile, load_altfile
+from pathplan.path_planner import plan_path
+from pathplan.utils import read_init_path, save_path
+import pathplan.sitl as sitl
+from pathplan.evaluation import calculate_intersections, mse, print_comparison_info
 
 
 #returns path json, alt file, shapefile, and tif
 def load_test_case(case_name):
-    test_dict = json.load(open("tests/"+case_name))
-    path, pro = read_init_path(test_dict['path'])
-    tif = read_tif(test_dict['tif'])
+    test_dict = json.load(open('tests/'+case_name))
+    path, pro = read_init_path('tests/'+ test_dict['path'])
+    tif = read_tif('tests/' + test_dict['tif'])
     if "shapes" not in test_dict:
         test_dict['shapes'] = "gen/shapes/{0}.shapes".format(case_name)
         test_dict['alts'] = "gen/shapes/{0}.alt.json".format(case_name)
         save_test_case(case_name,test_dict)
-        vecs = get_vector_from_raster(test_dict['tif'])
-        shapes, alt = get_shapes_from_vector(vecs, test_dict['proj'])
+
+        vecs = vectorize_raster(test_dict['tif'])
+        shapes, alt = shapelify_vectors(vecs, test_dict['proj'])
         binary = dumps(MultiPolygon(shapes))
+
         with open(test_dict['shapes'], "wb") as wkb_file:
             wkb_file.write(binary)
          	
@@ -32,16 +36,28 @@ def load_test_case(case_name):
     else:
         shapes = load_shapefile(test_dict['shapes'])
         alt = load_altfile(test_dict['alts'])
-    return path, alt, shapes, tif, test_dict
 
-def generate_path(case_name, path_name, params):
-    path, alt, shapes, tif, test_dict = load_test_case(case_name)
+    return path, alt, shapes, tif, pro, test_dict
+
+def generate_path(case_name, path_name, paramsfile): 
+    path, alt, shapes, tif, pro, test_case = load_test_case(case_name)
+    params_file = 'tests/params/'+paramsfile
+    params = json.load(open(params_file))
     tree = STRtree(shapes)
 
     gen_path, lines = plan_path(path, tree, alt, params['be_buffer'],params['obs_buffer'], params['min_alt_change'], params['climb_rate'], params['descent_rate'], params['max_speed']) 
-    test_dict['results'][path_name] = {'path':gen_path,'params': params}
-    test_dict['results']['lines'] = lines
-    save_test_case(case_name,test_dict)
+
+    lines_file = 'tests/lines/{0}.json'.format(case_name)
+    json.dump(lines, open('tests/lines/{0}.json'.format(case_name), 'w'))
+
+    test_case['lines'] = lines_file
+
+    path_loc = 'tests/gen-paths/{0}.json'.format(case_name)
+    save_path(path_loc, gen_path,  pro)
+    test_case['results'][path_name] = {}
+    test_case['results'][path_name]['gen-path'] = path_loc
+    test_case['results'][path_name]['params'] = params_file
+    save_test_case(case_name,test_case)
 
 def save_test_case(case_name, test_dict):
     json.dump(test_dict, open("tests/"+case_name, "w"))
@@ -50,71 +66,94 @@ def save_test_case(case_name, test_dict):
 import os
 
 def generate_flight(case_name, path_name, port, logdir):
-    path, alt, shapes, tif, test_dict = load_test_case(case_name)
-    if name not in test_dict['results']:
+    path, alt, shapes, tif,proj, test_dict = load_test_case(case_name)
+    if path_name not in test_dict['results']:
         print("Could not find the named path")
         return
-    gen_path = test_dict['results'][path_name]['path']
+    
+    os.chdir(os.path.expanduser('~/CSE145/AerialLidarPP'))
     subprocess.call(["make", "killsitl"])
     subprocess.call(["make", "runsitl"])
-    flown_path = sitl.fly(gen_path, port, os.getcwd() + "logs")
-    test_dict['results'][path_name]['flight_path'] = flown_path
+    bin_path = sitl.fly(port, test_dict['results'][path_name]['gen-path'], "tests/flights/{0}".format(case_name))
+    flown_path = sitl.parse_bins(bin_path)
+    flight_loc = "tests/flights/{0}.json".format(case_name)
+    json.dump(flown_path, open(flight_loc, "w")), 
+    test_dict['results'][path_name]['flight_path'] = flight_loc
     save_test_case(case_name,test_dict)
     
     
 
 #takes 
-from pathplan.plots import plot2d, plot3d
+from pathplan.viz import plot2d, plot3d
 
-def plot_3d_one(case_name, path_name):
-    path, alt, shapes, tif, test_dict = load_test_case(case_name)
-    path = (path_name, test_dict['results'][path_name]['path'])
-    plot3d(tif, True, path)
+import rasterio
+def plot_3d_one(case_name, *path_names):
+    path, alt, shapes, tif,proj, test_dict = load_test_case(case_name)
 
-def plot_3d_all(case_name ):
-    path, alt, shapes, tif, test_dict = load_test_case(case_name)
+    raster = rasterio.open('tests/'+test_dict['tif'])
     paths = []
+  
+    for path_name in path_names:
+        path, _ = read_init_path(test_dict['results'][path_name]['gen-path'])
+        paths.append((path_name, path))
 
-    for (name,res) in test_dict['results']:
-        paths.append((name, [res['path']])) 
+    plot3d(tif,raster,proj, *paths)
 
-    plot3d(tif, *paths)
-
-def plot_2d_one(case_name, path_name):
-    path, alt, shapes, tif, test_dict = load_test_case(case_name)
-    path = (path_name, test_dict['results'][path_name]['path'])
-    lines = test_dict['results']['lines']
-    plot2d(('surface',lines), path)
-
-def plot_2d_all(case_name):
-    path, alt, shapes, tif, test_dict = load_test_case(case_name)
-    
+def plot_2d_one(case_name, *plots):
     paths = []
+    path, alt, shapes, tif,proj, test_dict = load_test_case(case_name)
+    lines = json.load(open(test_dict['lines']))
+    print(lines)
+    for path_name in plots:
+        path, _ = read_init_path(test_dict['results'][path_name]['gen-path'])
+        path = (path_name, path)
+        paths.append(path)
+    plot2d(('surface',lines), False, *paths)
 
-    for (name,res) in test_dict['results'].iteritems():
-        if name != 'lines': 
-            paths.append((name, res['path'])) 
 
-    lines = ('surface',test_dict['results']['lines'])
-
-    plot2d(lines, *paths)
-    
-
-def create_test_case(case_name, tif_path, path_path, proj):
-    case_dict = {"tif": tif_path, "path": path_path, "proj":proj, "results":{}}
+def create_test_case(case_name, tif_path, path_path, proj, param):
+    case_dict = {"tif": tif_path, "path": path_path, "proj":proj, "param":param}
     save_test_case(case_name, case_dict)
+
+
+def compare_to_flight(case_name, path_name):
+    path, alt, shapes, tif,proj, test_dict = load_test_case(case_name)
+    flight,_ = read_init_path(test_dict['results'][path_name]['flight_path'])
+    
+    perform_comparisons(test_dict, (flight, "flight"), path_name)
+
+def compare_to_base(case_name, base, *paths):
+    path, alt, shapes, tif,proj, test_dict = load_test_case(case_name)
+    base_name = base
+    base, _ = read_init_path(base)
+
+    perform_comparisons(test_dict, (base, base_name), *paths)
+    
+
+
+def perform_comparisons(test_case, base, *paths):
+    base, base_name = base
+    for path_name in paths:
+        path, _ = read_init_path(test_case['results'][path_name]['gen-path'])
+        print_comparison_info(base, path, base_name, path_name)
+    
     
 
 def print_commands():
-    print("create NAME TIF PATH PROJ      -- Creates a test case with the specified name, tif, path, and projection status")
-    print("gen NAME PATH-NAME [PARAM]     -- Generates a path for the test case with optional param file specification")
-    print("fly NAME PATH-NAME PORT        -- Runs the SITL to generate a flight path for the given path (Note: may take a while")
-    print("plot-one-2d NAME PATH-NAME     -- Generates a 2d plot with one generated path")
-    print("plot-all-2d NAME               -- Generates a 2d plot with all of the generated paths")
-    print("plot-one-3d NAME PATH-NAME     -- Generates a 3d plot with one generated path")
-    print("plot-all-3d NAME               -- Generates a 3d plot with all of the generated paths")
-    print("set-params                     -- Interactively set the paramters for the algorithm")
-    print("help                           -- Display this msg again")
+    print("create NAME TIF PATH PROJ PARAM              -- Creates a test case with the specified name, tif, path, and projection status")
+    print("gen-np NAME                                  -- Generates a path for the test case with with the numpy alg")
+    print("gen NAME PATH-NAME PARAMS                    -- Generates a path for the test case with the shapely algorithm")
+    print("fly NAME PATH-NAME PORT                      -- Runs the SITL to generate a flight path for the given path (Note: may take a while")
+    print("plot-2d CASE NAME [NAMES ...]                -- Generates a 2d plot with one generated path")
+    print("plot-2d-all CASE                             -- Generates a 2d plot with all generated paths for the test case")
+    print("plot-2d-with-flight CASE NAME [NAMES...]     -- Generates a 2d plot with all of the generated paths")
+    print("plot-3d CASE NAME [NAMES ...]                -- Generates a 3d plot with one generated path")
+    print("plot-3d-all CASE                             -- Generates a 3d plot with all of the generated paths")
+    print("plot-3d-with-flight CASE NAME [NAMES...]     -- Generates a 2d plot with all of the generated paths")
+    print("compare-to-paths CASE BASE PATH [PATHS]       -- Prints comparison information about the two paths")
+    print("compare-to-flight CASE PATH                  -- Prints comparison information about the generated path and the flight path")
+    print("new-params  NAME                             -- Interactively set the parameters for the algorithm")
+    print("help                                         -- Display this msg again")
 
 
 if __name__ == '__main__':
@@ -126,65 +165,91 @@ if __name__ == '__main__':
 
     try:
         while True:
-            command = raw_input("Enter Command: ").split(" ")
-            if command[0] == 'create':
-                if len(command) == 5:
-                    create_test_case(*command[1:])
-                else:
-                    print("Error incorrect # of args")
+            try:
+                command = input("Enter Command: ").split(" ")
+                if command[0] == 'create':
+                    if len(command) == 6:
+                        create_test_case(*command[1:])
+                    else:
+                        print("Error incorrect # of args")
+                        print_commands()
+                    continue
+                elif command[0] == 'gen':
+                    if len(command) == 4:
+                        generate_path(*(command[1:]))
+                    else:
+                        print("Error incorrect # of args")
+                        print_commands()
+                    continue
+                elif command[0] == 'fly':
+                    if len(command) == 4:
+                        generate_flight(*(command[1:] + ["logs"]))
+                    else:
+                        print("Error incorrect # of args")
+                        print_commands()
+                    continue
+                elif command[0] == 'plot-2d':
+                    if len(command) > 2:
+                        plot_2d_one(*command[1:])
+                    else:
+                        print("Error incorrect # of args")
+                        print_commands()
+                    continue
+                elif command[0] == 'plot-all-2d':
+                    if len(command) == 2:
+                        plot_2d_all(command[1])
+                    else:
+                        print("Error incorrect # of args")
+                        print_commands()
+                    continue
+                elif command[0] == 'plot-3d':
+                    if len(command) > 2:
+                        plot_3d_one(*command[1:])
+                    else:
+                        print("Error incorrect # of args")
+                        print_commands()
+                    continue
+                elif command[0] == 'plot-all-3d':
+                    if len(command) == 2:
+                        _,_,_,_,_,test_dict = load_test_case(command[1])
+                        plot_3d_one(command[1], *test_dict['results'])
+                    else:
+                        print("Error incorrect # of args")
+                        print_commands()
+                    continue
+                elif command[0] == 'compare-paths':
+                    if len(command) > 4:
+                        print("Error incorrect # of args") 
+                        print_commands()
+                    else:
+                        compare_to_base(*command[1:])
+                elif command[0] == 'compare-to-flight':
+                    if len(command) == 4:
+                        print("Error incorrect # of args") 
+                        print_commands()
+                    else:
+                        compare_to_flight(*command[1:])
+                elif command[0] == 'new-params':
+                    if len(command) != 2:
+                        print("Incorrect number of args")
+                        print_commands()
+                    else:
+                        params = {}
+                        params['be_buffer'] = float(input("Enter distance from bare earth: "))
+                        params['obs_buffer'] = float(input("Enter distance from surfaces: ")) 
+                        params['min_alt_change'] = float(input("Enter min alt change: "))
+                        params['climb_rate'] = float(input("Enter climb_rate: ")) 
+                        params['descent_rate'] = float(input("Enter descent rate: "))
+                        params['max_speed'] = float(input("Enter maximum horizontal speed: "))
+                        json.dump(params, open('tests/params/{0}.json'.format(command[1]), 'w'))
+                elif command[0] == 'help':
                     print_commands()
-                continue
-            elif command[0] == 'gen':
-                if len(command) == 3 or len(command) == 4:
-                    generate_path(*(command[1:] + [params]))
-                else:
-                    print("Error incorrect # of args")
-                    print_commands()
-                continue
-            elif command[0] == 'fly':
-                if len(command) == 4:
-                    generate_flight(*(command[1:] + ["logs"]))
-                else:
-                    print("Error incorrect # of args")
-                    print_commands()
-                continue
-            elif command[0] == 'plot-one-2d':
-                if len(command) == 3:
-                    plot_2d_one(*command[1:])
-                else:
-                    print("Error incorrect # of args")
-                    print_commands()
-                continue
-            elif command[0] == 'plot-all-2d':
-                if len(command) == 2:
-                    plot_2d_all(command[1])
-                else:
-                    print("Error incorrect # of args")
-                    print_commands()
-                continue
-            elif command[0] == 'plot-one-3d':
-                if len(command) == 3:
-                    plot_3d_one(*command[1:])
-                else:
-                    print("Error incorrect # of args")
-                    print_commands()
-                continue
-            elif command[0] == 'plot-all-3d':
-                if len(command) == 2:
-                    plot_3d_all(*command[1])
-                else:
-                    print("Error incorrect # of args")
-                    print_commands()
-                continue
-            elif command[0] == 'set-params':
-                params['be_buffer'] = float(raw_input("Enter distance from bare earth: "))
-                params['obs_buffer'] = float(raw_input("Enter distance from surfaces: ")) 
-                params['min_alt_change'] = float(raw_input("Enter min alt change: "))
-                params['climb_rate'] = float(raw_input("Enter climb_rate: ")) 
-                params['descent_rate'] = float(raw_input("Enter descent rate: "))
-                params['max_speed'] = float(raw_input("Enter maximum horizontal speed: "))
-            elif command[0] == 'help':
-                print_commands()
+            except KeyboardInterrupt:
+                raise KeyboardInterrupt
+            except Exception as e:
+                print("There was a problem, please try again")
+                traceback.print_exc()
     except KeyboardInterrupt:
         print("Closing the Aerial Lidar interactive prompt") 
+
 
