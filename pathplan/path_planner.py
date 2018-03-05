@@ -21,8 +21,6 @@ import sys
 
 
 
-def distance(p1, p2):
-    return ((p1[0]-p2[0])**2 + (p1[1]-p2[1])**2)**.5
 
 def get_intersection_map(strtree, alt_dict, segment, buf):
     ls = LineString(segment)
@@ -140,7 +138,7 @@ def plan_path(path, strtree, alt_dict, be_buffer, obs_buffer, min_alt_change, cl
             curr_alt = smooth_dict[curr.wkt]
             horiz = calculate_horiz_dist(curr_alt, last_alt, climb_rate, descent_rate, max_speed)
 
-            print horiz
+            print(horiz)
 
             mid = prev.coords[1]
 

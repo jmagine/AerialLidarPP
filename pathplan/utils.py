@@ -1,19 +1,22 @@
 import json
 import pyproj
-from geo import utm_proj, wgs84
+from pathplan.geo import utm_proj, wgs84
+
+def distance(p1, p2):
+    return ((p1[0]-p2[0])**2 + (p1[1]-p2[1])**2)**.5
 
 def read_init_path(filepath, proj=None):
     miss_dict = json.load(open(filepath))
 
     tups = []
     for wp in miss_dict:
-	if proj == None:
-	    proj = utm_proj(wp['latitude'], wp['longitude'])
+        if proj == None:
+            proj = utm_proj(wp['latitude'], wp['longitude'])
 
-	coord = pyproj.transform(wgs84, proj, wp['longitude'], wp['latitude'],0)
-	if 'altitude' in wp:
-	    coord = (coord[0], coord[1], wp['altitude'] * 3.28084)
-	tups.append(coord)
+        coord = pyproj.transform(wgs84, proj, wp['longitude'], wp['latitude'],0)
+        if 'altitude' in wp:
+            coord = (coord[0], coord[1], wp['altitude'] * 3.28084)
+        tups.append(coord)
 
     return tups, proj
 

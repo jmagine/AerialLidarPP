@@ -1,9 +1,8 @@
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
-from path_planner import distance, read_init_path
-from path_planner import distance
-from geo import wgs84
+from pathplan.utils import distance, read_init_path
+from pathplan.geo import wgs84
 import numpy as np
 import pyproj
 

@@ -2,9 +2,11 @@
 Contains all methods for evaluating the performance of a path
 '''
 import sys, time, os, struct, json, fnmatch
-from utils import load_shapefile, load_altfile
+from pathplan.geo import load_shapefile, load_altfile
 from shapely.geometry import LineString, Polygon
 from shapely.strtree import STRtree
+from scipy.interpolate import interp1d
+from scipy.integrate import quad
 import numpy as np
 """
 Utility functions to allow for computing MSE of expected and actual waypoints
@@ -31,7 +33,6 @@ import math
 
 import types
 
-wgs84 = pyproj.Proj(init="epsg:4326")
 
 '''
 Returns a list of LineStrings indicating the sections of the
@@ -150,6 +151,25 @@ def gen_path_via_nearest_points(planned, flown):
         yield found_pt
 
 
+from pathplan.viz import build_distance_lists
+def area_between_curves(first, second, max_dist=None):
+    fx, fy = build_distance_lists(first)
+    sx, sy = build_distance_lists(second)
+
+    if max_dist == None:
+        max_dist = min(fx[-1], sx[-1])
+
+    f1 = interp1d(fx, fy)
+    f2 = interp1d(sx, sy)
+
+    farea, ferror = quad(f1, 0, max_dist)
+    sarea, serror = quad(f2, 0, max_dist)
+
+    return abs(farea - sarea)
+
+    
+    
+
 def mse(expected, actual):
     """
     Mean squared error of expected and actual waypoints.
@@ -160,7 +180,7 @@ def mse(expected, actual):
         The mean squared error
     """
     expected = to_np_array(generator_to_list(expected))
-    actual = to_np_array(generator_to_list(actual))
+    actual = to_np_array(generator_to_list(gen_path_via_nearest_points(expected, actual)))
 
     return ((expected - actual)**2).mean(axis=0) # avg along columns
 
@@ -169,13 +189,16 @@ def calc_errors_with_gen_noise(filepath, metric=mse):
     noise_pts = list(gen_noise_points(waypoints))
     return metric(expected=waypoints, actual=noise_pts)
 
-def print_planned_and_flown_path_debug_info(planned, flown, metric=mse):
-    print(f"Path Debug:")
-    print(f"  len(planned) = {len(planned)}")
-    print(f"  len(flown)   = {len(flown)}")
-    print(f"  Planned Path Total distance: {total_dist(planned)}")
-    print(f"  Flown Path Total distance:   {total_dist(flown)}")
-    print(f"  Error based on metric = {metric(planned, flown)}")
+def print_comparison_info(planned, flown, name1="planned", name2="flown", metrics=[("Area", area_between_curves)]):
+    planned = list(map(to_np_array, planned))
+    flown = list(map(to_np_array, flown))
+    print("Path Debug")
+    print("  len({0}) = {1}".format(name1, len(planned)))
+    print("  len({0}) = {1}".format(name2, len(flown)))
+    print("  {0} Path Total distance: {1}".format(name1, total_dist(planned)))
+    print("  {0} Path Total distance:   {1}".format(name2, total_dist(flown)))
+    for name, metric in metrics:
+        print("  Error based on {0} = {1}".format(name, metric(planned, flown)))
 
 def display_two_paths(one, two):
     """
