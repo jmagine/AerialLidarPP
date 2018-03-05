@@ -5,7 +5,7 @@ import json
 import time
 import math
 import os
-import os.shutil as sh
+import shutil as sh
 
 try:
     from pymavlink.mavextra import *
@@ -54,17 +54,19 @@ def load_path_from_bin(filename):
     gps_points = [{'latitude':x['Lat'],'longitude':x['Lng'], 'altitude':x['Alt']}  for x in parsed_log if x['mavpackettype'] == 'GPS']
     return gps_points
 
+import glob
 def parse_bins(logs):
     def key_fun(filename):
         return int(os.path.splitext(os.path.basename(filename))[0])
 
     files = list(sorted(glob.glob(logs+"/*.BIN"), key=key_fun))
     
+    path = []
     for binfile in files:
         new_path = load_path_from_bin(binfile)
         path.extend(new_path)
 
-    return new_path
+    return path
 
 def fly(port, missionfile, logdir):
     time.sleep(10)
@@ -200,7 +202,10 @@ def fly(port, missionfile, logdir):
         print('Distance to waypoint (%s): %s' % (nextwaypoint, distance_to_current_waypoint()))
         if nextwaypoint == len(mission)-1: 
             print("Exit 'standard' mission when start heading to final waypoint ({0})".format(len(mission)))
+            break
 
     sh.move("{0}/{1}".format(os.getcwd(), "logs"), logdir)
     os.remove("eeprom.bin")
     sh.rmtree("terrain")
+    
+    return logdir

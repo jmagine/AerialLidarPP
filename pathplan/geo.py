@@ -3,14 +3,22 @@ This file contains all methods for converting between different geoographical
 projections and dealing with tif, shape, and altitude json files
 '''
 
-wgs84 = pyproj.Proj(init="epsg:4326")
 
 from rasterio.features import shapes
+import rasterio
 from shapely.ops import transform
 from shapely.geometry import shape, LineString, Polygon, MultiPolygon
 from shapely.strtree import STRtree
-from shapely.wkb import dumps
+from shapely.wkb import dumps, loads
 from affine import Affine
+from PIL import Image
+import pyproj
+import numpy as np
+import json
+
+import math
+
+wgs84 = pyproj.Proj(init="epsg:4326")
 
 def get_image_coord(raster, x, y):
   box = raster.bounds()

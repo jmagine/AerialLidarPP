@@ -3,17 +3,21 @@ from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
 from path_planner import distance, read_init_path
 from path_planner import distance
+from geo import wgs84
+import numpy as np
+import pyproj
 
 def build_distance_lists(tups):
+    print(tups)
     xs = [0]
     last = tups[0]
-    ys = last[0][2]
+    ys = [last[2]]
     acc_dist = 0
 
     for tup in tups[1:]:
         acc_dist += distance(last, tup)
         xs.append(acc_dist)
-        ys.append(last[0][2])
+        ys.append(last[2])
         last = tup 
 
     return xs, ys
@@ -21,7 +25,7 @@ def build_distance_lists(tups):
 #Lines: tuple ((x1, y1), (x2, y2)) mapped to a list of LineStrings
 # Each path is a tuple mapped to a list of LineStrings
 # Plots distance along the path vs Z
-def plot2d(lines, *paths, scatter=False):
+def plot2d(lines, scatter=False, *paths): 
   surf_name, lines = lines
   accum_dist = 0 
   lines_graph_x = [0]
@@ -30,7 +34,7 @@ def plot2d(lines, *paths, scatter=False):
   fig = plt.figure()
   ax = fig.add_subplot(111)
 
-  lines_graph_x, lines_graph_y = build_distance_list(lines)
+  lines_graph_x, lines_graph_y = build_distance_lists(lines)
 
   ax.plot(lines_graph_x, lines_graph_y, label=surf_name, color='r')
   
@@ -50,7 +54,8 @@ def plot2d(lines, *paths, scatter=False):
   plt.legend(loc='bottom left')
   plt.show()
 
-def plot3d(image, *paths, small=True):
+import rasterio
+def plot3d(image, raster, proj, *paths):
 
   fig = plt.figure()
   ax = fig.add_subplot(111, projection='3d')
@@ -58,23 +63,44 @@ def plot3d(image, *paths, small=True):
   print(paths)
 
   for name,waypoints in paths:
-      x_points, y_points, z_points, speed = zip(*waypoints)
+      x_points, y_points, z_points = zip(*waypoints)
       ax.plot(x_points, y_points, zs=z_points, label=name)
 
-  if small:
-    max_x = max(x_points)
-    max_y = max(y_points)
-    print(max_x, max_y)
-    print(image[0:max_y+1, 0:max_x+1].shape)
+  max_x = max(x_points)
+  max_y = max(y_points)
 
-    x_raster = np.arange(0, max_x + 1, step=1)
-    y_raster = np.arange(0, max_y + 1, step=1)
-    x_raster, y_raster = np.meshgrid(x_raster, y_raster)
-    ax.plot_surface(x_raster, y_raster, image[0:max_y+1, 0:max_x+1], cmap=cm.coolwarm,linewidth=0, antialiased=False)
-  else:
-    x_raster = np.arange(0, image.shape[1], step=1)
-    y_raster = np.arange(0, image.shape[0], step=1)
-    x_raster, y_raster = np.meshgrid(x_raster, y_raster)
-    ax.plot_surface(x_raster, y_raster, image, cmap=cm.coolwarm,linewidth=0, antialiased=False)
+  bounds = raster.bounds
+
+  left, top = pyproj.transform(wgs84, proj, bounds.left, bounds.top)
+  right, bottom = pyproj.transform(wgs84, proj, bounds.right, bounds.bottom)
+
+  print(bounds)
+  print(raster.width)
+  print(raster.height)
+
+  width = right - left 
+  x_step = width / raster.width
+
+  
+  height = abs(top - bottom)
+  y_step = height / raster.height
+
+  print(x_step)
+  print(y_step)
+
+  x_raster = np.arange(int(left), int(right), step=x_step)
+  y_raster = np.arange(int(bottom), int(top), step=y_step)
+
+  print(len(x_raster))
+  print(len(y_raster))
+
+  x_raster, y_raster = np.meshgrid(x_raster, y_raster)
+
+  print(len(x_raster))
+  print(len(y_raster))
+  print(image.shape)
+  print(x_raster.shape)
+  print(y_raster.shape)
+  ax.plot_surface(x_raster[1:, 1:], y_raster[1:, 1:], image, cmap=cm.coolwarm,linewidth=0, antialiased=False)
 
   plt.show()

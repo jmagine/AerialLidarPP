@@ -13,7 +13,6 @@ from matplotlib import cm
 import numpy as np
 from PIL import Image
 from math import hypot
-from utils import plot_path, read_tif
 
 '''[Config vars]------------------------------------------------------------'''
 #RASTER_FILE = "../tests/images/sine-0.1f-20a.tif"

@@ -2,11 +2,13 @@ import rasterio
 import pyproj
 import matplotlib.pyplot as plt
 import mpl_toolkits.mplot3d as Axes3D
+
 from shapely.ops import transform
 from shapely.geometry import shape, LineString, Polygon, MultiPolygon
 from shapely.strtree import STRtree
 from shapely.wkb import dumps
-from utils import load_shapefile, load_altfile, plot_path, read_tif
+
+from pathplan.utils import read_init_path
 
 
 import json
@@ -232,40 +234,7 @@ def generate_points(line, alt, climb_rate, descent_rate, min_speed, last_start):
     
     
 
-def read_init_path(filepath, proj=None):
-    miss_dict = json.load(open(filepath))
 
-    tups = []
-    for wp in miss_dict:
-        if proj == None:
-            proj = utm_proj(wp['latitude'], wp['longitude'])
-
-        coord = pyproj.transform(wgs84, proj, wp['longitude'], wp['latitude'],0)
-        if 'altitude' in wp:
-            coord = (coord[0], coord[1], wp['altitude'] * 3.28084)
-        tups.append(coord)
-
-    return tups, proj
-
-def display_path(path, shapes, alt_dict):
-    x, y, z = zip(*path)
-    
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    
-    ax.plot(x, y, z)
-    plt.show()
-
-#Also does projection
-def save_path(filepath, path, proj):
-    arr = []
-    for lon, lat, alt in path:
-        if proj != None:
-            lon, lat, alt = pyproj.transform(proj, wgs84, lon, lat, alt)
-        new_dict = {'latitude' : lat, 'longitude' : lon, 'altitude' : alt * .3048, 'speed':0}
-        arr.append(new_dict)
-
-    json.dump(arr, open(filepath, 'w'))
 
 
 
