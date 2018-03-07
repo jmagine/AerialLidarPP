@@ -9,7 +9,6 @@
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
-from geo import utm_proj
 
 import numpy as np
 from PIL import Image
@@ -272,7 +271,6 @@ def plan_path(init_waypoints, tiffile, smoothing_params=[10, 0.5]):
   raster_width = abs(raster.bounds.right - raster.bounds.left)
   raster_height = abs(raster.bounds.top - raster.bounds.bottom)
  
-  utm = utm_proj(raster.bounds.top, raster.bounds.right)
 
   waypoints = []
 
@@ -305,3 +303,18 @@ def plan_path(init_waypoints, tiffile, smoothing_params=[10, 0.5]):
     points.append((lat, lon, z1))
   
   return points
+
+import sys
+if __name__ == '__main__':
+  if len(sys.argv) < 3:
+    print("not enough arguments")
+    sys.exit() 
+  
+  tiffile = sys.argv[1]
+  path_file = sys.argv[2]
+  
+  path = [(x['latitude'], x['longitude']) for x in json.load(open(path_file))]
+  
+  new_path = plan_path(path, tiffile)
+
+  save_path([{'latitude':lat, 'longitude':lon, 'altitude':alt} for (lat,lon,alt) in new_path], 'numpy_path.json')

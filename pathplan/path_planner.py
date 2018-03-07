@@ -133,45 +133,45 @@ def plan_path(path, strtree, alt_dict, be_buffer, obs_buffer, min_alt_change, cl
         lines, smooth_dict = smooth_segments(seg[0], lines, int_dict, min_alt_change)
 
         points = [(lines[0].coords[0][0], lines[0].coords[0][1], smooth_dict[lines[0].wkt], max_speed)]
-        for i in range(1,len(lines)):
-            prev = lines[i-1]
-            curr = lines[i]
-            last_alt = smooth_dict[prev.wkt]
-            curr_alt = smooth_dict[curr.wkt]
+        #for i in range(1,len(lines)):
+        #    prev = lines[i-1]
+        #    curr = lines[i]
+        #    last_alt = smooth_dict[prev.wkt]
+        #    curr_alt = smooth_dict[curr.wkt]
 
-            horiz = calculate_horiz_dist(curr_alt, last_alt, climb_rate, descent_rate, max_speed)
+        #    horiz = calculate_horiz_dist(curr_alt, last_alt, climb_rate, descent_rate, max_speed)
 
-            print(horiz)
+        #    print(horiz)
 
-            mid = prev.coords[1]
+        #    mid = prev.coords[1]
 
-            speed = max_speed
-            if last_alt > curr_alt:
-                #We need to descent, so we project at the curr altitude
-                other = curr.coords[1]
-                dx, dy = vec_sub(other, mid) 
+        #    speed = max_speed
+        #    if last_alt > curr_alt:
+        #        #We need to descent, so we project at the curr altitude
+        #        other = curr.coords[1]
+        #        dx, dy = vec_sub(other, mid) 
 
-                projected = vec_add(mid, (horiz * dx, horiz * dy))
+        #        projected = vec_add(mid, (horiz * dx, horiz * dy))
 
 
-                if horiz > curr.length:
-                    horiz = curr.length 
-                    speed = horiz / (abs(last_alt - curr_alt) / descent_rate )
+        #        if horiz > curr.length:
+        #            horiz = curr.length 
+        #            speed = horiz / (abs(last_alt - curr_alt) / descent_rate )
 
-                points.append((mid[0], mid[1], last_alt, speed))
-                points.append((projected[0], projected[1], curr_alt, max_speed))
-            else:
-                #We need to ascend, so we project at the last altitude
-                other = prev.coords[0]
-                dx, dy = vec_sub(other, mid) 
-                projected = vec_add(mid, (horiz* dx, horiz* dy))
+        #        points.append((mid[0], mid[1], last_alt, speed))
+        #        points.append((projected[0], projected[1], curr_alt, max_speed))
+        #    else:
+        #        #We need to ascend, so we project at the last altitude
+        #        other = prev.coords[0]
+        #        dx, dy = vec_sub(other, mid) 
+        #        projected = vec_add(mid, (horiz* dx, horiz* dy))
 
-                if horiz > prev.length:
-                    horiz = prev.length 
-                    speed = horiz / (abs(last_alt - curr_alt) / descent_rate )
+        #        if horiz > prev.length:
+        #            horiz = prev.length 
+        #            speed = horiz / (abs(last_alt - curr_alt) / descent_rate )
 
-                points.append((projected[0], projected[1], last_alt, speed))
-                points.append((mid[0], mid[1], curr_alt, max_speed))
+        #        points.append((projected[0], projected[1], last_alt, speed))
+        #        points.append((mid[0], mid[1], curr_alt, max_speed))
 
         last_alt = smooth_dict[lines[-1].wkt]
         points.append((lines[-1].coords[1][0], lines[-1].coords[1][1], last_alt, max_speed))
