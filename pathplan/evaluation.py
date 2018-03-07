@@ -226,6 +226,7 @@ def display_surface(path_one, path_two):
         path_two - List of waypoints in format [(x, y, z), (x, y, z), ...]
     """
 
+    import matplotlib
     Z1 = 8.0
     Z2 = 9.0
 
@@ -239,9 +240,19 @@ def display_surface(path_one, path_two):
 
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    ax.plot(x1, y1, z1, 'k-', linewidth=0.3, color='b')
-    ax.plot(x2, y2, z2, 'k-', linewidth=0.3, color='m')
-    ax.plot_surface(X, Y, Z, color='r', alpha=0.4, linewidth=0)
+    ax.set_xlabel("Distance along path (ft)")
+    ax.set_ylabel("Distance along path (ft)")
+    ax.set_zlabel("Altitude")
+    ax.plot(x1, y1, z1, 'k-', linewidth=1.4, color='b', label="Planned Path")
+    ax.plot(x2, y2, z2, 'k-', linewidth=1.4, color='r', label="Flown Path")
+    ax.plot_surface(X, Y, Z, color='g', alpha=0.4, linewidth=0, label="Highlighted Error")
+
+    # Proxy for displaying legend, as legends are not supported in 3d Plots:
+    colors = ["blue", "red", "green"]
+    proxy1 = matplotlib.lines.Line2D([0],[0], c=colors[0])
+    proxy2 = matplotlib.lines.Line2D([0],[0], c=colors[1])
+    proxy3 = matplotlib.lines.Line2D([0],[0], c=colors[2])
+    ax.legend([proxy1, proxy2, proxy3], ['Planned Path', 'Flown Path', 'Highlighted Error'], numpoints = 1)
 
     plt.show()
 
@@ -260,15 +271,23 @@ def display_surface_with_file(filepath):
 
 
 def main():
-    planned = list(read_path_from_json("output/min_alt_2_gps.json"))
+    planned = list(read_path_from_json("output/path.json"))
     flown = read_path_from_json("output/min_alt_2.flight.json")
-
     # NOTE: altitude in output/min_alt_2.flight.json adds 584
     flown = list(map(lambda xyz: np.array([xyz[0], xyz[1], xyz[2] - 584.0]), flown))
     flown = list(gen_path_via_nearest_points(planned, flown))
 
-    print_planned_and_flown_path_debug_info(planned, flown)
-    display_surface(planned, flown)
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.plot(*np.array(planned).T, 'o', color='b')
+    plt.show()
+
+    # print_planned_and_flown_path_debug_info(planned, flown)
+    # display_surface(planned, flown)
+
+    # p = list(read_path_from_json("output/path.json"))
+    # flown = list(read_path_from_json("output/min_alt_2.flight.json"))
+    # display_two_paths(p, flown)
 
 
 # Uncomment to test
