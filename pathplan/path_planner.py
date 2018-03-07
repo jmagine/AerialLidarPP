@@ -8,7 +8,7 @@ from shapely.geometry import shape, LineString, Polygon, MultiPolygon
 from shapely.strtree import STRtree
 from shapely.wkb import dumps
 
-from pathplan.utils import read_init_path
+from pathplan.utils import read_init_path, distance
 
 
 import json
@@ -45,6 +45,8 @@ def get_intersection_map(strtree, alt_dict, segment, buf):
  
     return lines, int_dict
 
+from functools import reduce
+
 def smooth_segments(start, segments, seg_dict, min_change):
     sorted_segs = list(sorted(segments, key=lambda x: distance(start, x.coords[0])))
     smooth_dict = dict(seg_dict)
@@ -64,7 +66,7 @@ def smooth_segments(start, segments, seg_dict, min_change):
             smooth_dict[nxt.wkt] = nxt_alt
         return acc    
 
-    return reduce(reducer, sorted_segs[1:], [sorted_segs[0]]), smooth_dict
+    return list(reduce(reducer, sorted_segs[1:], [sorted_segs[0]])), smooth_dict
 
 def resolve_two_dicts(canopies, lines, canopy_dict, int_dict):
     canopy = STRtree(list(canopies))
@@ -136,6 +138,7 @@ def plan_path(path, strtree, alt_dict, be_buffer, obs_buffer, min_alt_change, cl
             curr = lines[i]
             last_alt = smooth_dict[prev.wkt]
             curr_alt = smooth_dict[curr.wkt]
+
             horiz = calculate_horiz_dist(curr_alt, last_alt, climb_rate, descent_rate, max_speed)
 
             print(horiz)

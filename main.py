@@ -52,7 +52,7 @@ def generate_path(case_name, path_name, paramsfile):
 
     test_case['lines'] = lines_file
 
-    path_loc = 'tests/gen-paths/{0}.json'.format(case_name)
+    path_loc = 'tests/gen-paths/{0}.json'.format(path_name)
     save_path(path_loc, gen_path,  pro)
     test_case['results'][path_name] = {}
     test_case['results'][path_name]['gen-path'] = path_loc
@@ -105,6 +105,7 @@ def plot_2d_one(case_name, *plots):
     lines = json.load(open(test_dict['lines']))
     print(lines)
     for path_name in plots:
+        print(path_name)
         path, _ = read_init_path(test_dict['results'][path_name]['gen-path'])
         path = (path_name, path)
         paths.append(path)
@@ -112,7 +113,7 @@ def plot_2d_one(case_name, *plots):
 
 
 def create_test_case(case_name, tif_path, path_path, proj, param):
-    case_dict = {"tif": tif_path, "path": path_path, "proj":proj, "param":param}
+    case_dict = {"tif": tif_path, "path": path_path, "proj":proj, "param":param, "results":{}}
     save_test_case(case_name, case_dict)
 
 

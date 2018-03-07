@@ -9,6 +9,7 @@
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
+from geo import utm_proj
 
 import numpy as np
 from PIL import Image
@@ -258,17 +259,35 @@ def smooth_line(points, max_height_diff):
   return new_points
 
   
-def plan_path(waypoints, image, smoothing_params=[10, 0.5]):
+import rasterio
+import pyproj
+def plan_path(init_waypoints, tiffile, smoothing_params=[10, 0.5]):
   #[TODO] read waypoints from file
   #waypoints = [(0,0), (199, 199), (0, 199), (199, 0)]
 
-  #[TODO] possibly do some command line args
+  raster = rasterio.open(tiffile)
 
-  #[TODO] make some gps->raster and raster->gps coord functions
+  raster_proj = pyproj.Proj(raster.crs)
 
+  raster_width = abs(raster.bounds.right - raster.bounds.left)
+  raster_height = abs(raster.bounds.top - raster.bounds.bottom)
+ 
+  utm = utm_proj(raster.bounds.top, raster.bounds.right)
+
+  waypoints = []
+
+  for waypoint in init_waypoints:
+    x = int((abs(waypoint[0] - raster.bounds.bottom) / raster_height) * raster.height)
+    y = int((abs(waypoint[1] - raster.bounds.left) / raster_width) * raster.width)
+    waypoints.append((x, y))
+
+
+  print(waypoints)
   #[DEBUG]
   #plt.imshow(image)
   #plt.show()
+  
+  image = read_tif(tiffile)
   print(image)
   print(image.shape)
   
@@ -278,5 +297,11 @@ def plan_path(waypoints, image, smoothing_params=[10, 0.5]):
 
   for smooth_param in smoothing_params:
     z = smooth_line(z, smooth_param) 
+
+  points = []
+
+  for x1, y1, z1 in zip(x,y,z):
+    lon, lat = raster.affine * (x1, y1)
+    points.append((lat, lon, z1))
   
-  return zip(x, y, z)
+  return points
