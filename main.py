@@ -15,10 +15,10 @@ from pathplan.evaluation import calculate_intersections, mse, print_comparison_i
 
 
 #returns path json, alt file, shapefile, and tif
-def load_test_case(case_name):
-    test_dict = json.load(open('tests/'+case_name))
-    path, pro = read_init_path('tests/'+ test_dict['path'])
-    tif = read_tif('tests/' + test_dict['tif'])
+def load_test_case(case_file):
+    test_dict = json.load(case_file)
+    path, pro = read_init_path(test_dict['path'])
+    tif = read_tif(test_dict['tif'])
     if "shapes" not in test_dict:
         test_dict['shapes'] = "gen/shapes/{0}.shapes".format(case_name)
         test_dict['alts'] = "gen/shapes/{0}.alt.json".format(case_name)
@@ -39,10 +39,8 @@ def load_test_case(case_name):
 
     return path, alt, shapes, tif, pro, test_dict
 
-def generate_path(case_name, path_name, paramsfile): 
+def generate_path(case_file, path_name, params): 
     path, alt, shapes, tif, pro, test_case = load_test_case(case_name)
-    params_file = 'tests/params/'+paramsfile
-    params = json.load(open(params_file))
     tree = STRtree(shapes)
 
     gen_path, lines = plan_path(path, tree, alt, params['be_buffer'],params['obs_buffer'], params['min_alt_change'], params['climb_rate'], params['descent_rate'], params['max_speed']) 
@@ -60,7 +58,7 @@ def generate_path(case_name, path_name, paramsfile):
     save_test_case(case_name,test_case)
 
 def save_test_case(case_name, test_dict):
-    json.dump(test_dict, open("tests/"+case_name, "w"))
+    json.dump(test_dict, open(case_name, "w"))
 
 
 import os

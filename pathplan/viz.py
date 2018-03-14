@@ -24,26 +24,29 @@ def build_distance_lists(tups):
 #Lines: tuple ((x1, y1), (x2, y2)) mapped to a list of LineStrings
 # Each path is a tuple mapped to a list of LineStrings
 # Plots distance along the path vs Z
-def plot2d(lines, scatter=False, *paths): 
+def plot2d(lines, *paths, *kwargs): 
+  
   surf_name, lines = lines
-  accum_dist = 0 
   lines_graph_x = [0]
   lines_graph_y = [lines[0][2]]
 
-  fig = plt.figure()
-  ax = fig.add_subplot(111)
+  if 'ax' not in kwargs:
+      fig = plt.figure()
+      ax = fig.add_subplot(111)
+  else:
+      ax = kwargs['ax']
 
   lines_graph_x, lines_graph_y = build_distance_lists(lines)
 
   ax.plot(lines_graph_x, lines_graph_y, label=surf_name, color='r')
   
   for (name,path) in paths:
-      print("plotting a path")
+      print("plotting path {0}".format(name))
       path_x, path_y = build_distance_lists(path)
 
       ax.plot(path_x, path_y, label=name)
 
-      if scatter:
+      if 'scatter' in kwargs and kwargs['scatter']:
           ax.scatter(path_x, path_y, color='g')
    
   
