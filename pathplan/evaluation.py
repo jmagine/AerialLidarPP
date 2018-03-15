@@ -8,6 +8,7 @@ from shapely.strtree import STRtree
 from scipy.interpolate import interp1d
 from scipy.integrate import quad
 import numpy as np
+import json
 """
 Utility functions to allow for computing MSE of expected and actual waypoints
 of the path when running through simulation or in real time. This file also
@@ -76,7 +77,7 @@ def read_path_from_json(filepath):
 
     proj      = lambda pt: utm_proj(pt[X], pt[Y])
     cartesian = lambda pt: pyproj.transform(wgs84, proj(pt), pt[X], pt[Y], pt[Z])
-    xyz       = lambda pt: np.array([*cartesian(pt)])
+    xyz       = lambda pt: np.array(*[cartesian(pt)])
     points = json.load(open(filepath))
     return map(xyz, points)
 
@@ -200,17 +201,17 @@ def print_comparison_info(planned, flown, name1="planned", name2="flown", metric
     for name, metric in metrics:
         print("  Error based on {0} = {1}".format(name, metric(planned, flown)))
 
-def display_two_paths(one, two):
-    """
-    Args:
-        path_one - List of waypoints in format [(x, y, z), (x, y, z), ...]
-        path_two - List of waypoints in format [(x, y, z), (x, y, z), ...]
-    """
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    ax.plot(*np.array(one).T, 'k-', color='b', linewidth=1.0)
-    ax.plot(*np.array(two).T, 'k-', color='r', linewidth=1.0)
-    plt.show()
+#def display_two_paths(one, two):
+#    """
+#    Args:
+#        path_one - List of waypoints in format [(x, y, z), (x, y, z), ...]
+#        path_two - List of waypoints in format [(x, y, z), (x, y, z), ...]
+#    """
+#    fig = plt.figure()
+#    ax = fig.add_subplot(111, projection='3d')
+#    ax.plot(*np.array(one).T, 'k-', color='b', linewidth=1.0)
+#    ax.plot(*np.array(two).T, 'k-', color='r', linewidth=1.0)
+#    plt.show()
 
 def display_gen_noise_path_with_file(filepath):
     waypoints = list(read_path_from_json(filepath))
@@ -279,7 +280,7 @@ def main():
 
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    ax.plot(*np.array(planned).T, 'o', color='b')
+    #ax.plot(*np.array(planned).T, 'o', color='b')
     plt.show()
 
     # print_planned_and_flown_path_debug_info(planned, flown)

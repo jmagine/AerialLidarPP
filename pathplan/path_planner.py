@@ -43,26 +43,26 @@ def get_intersection_map(strtree, alt_dict, segment, buf):
 
 from functools import reduce
 
-def project_along_line(self, dist, p1, p2):
+def project_along_line(dist, p1, p2):
     dx = p1[0] - p2[0]
     dy = p1[1] - p2[1]
     norm = (dx**2 + dy**2)**.5
-    dx = (dx / norm) * (min_length - dist)
-    dy = (dy / norm) * (min_length - dist)
-    return (p1[0] + dx, p1[1] + dy)
+    dx = (dx / norm) * (dist)
+    dy = (dy / norm) * (dist)
+    return (p2[0] + dx, p2[1] + dy)
 
 def handle_canyon(line1, alt0, alt1, alt2, min_speed, climb_rate, descent_rate, target_speed):
     descent_time = (alt0 - alt1) * descent_rate
     ascent_time = (alt2 - alt1) * climb_rate
     total_time = descent_time + ascent_time
-    target_time = line1.length() / target_speed
+    target_time = line1.length / target_speed
 
     if target_time >= descent_time:
         new_start = project_along_line(descent_time * target_speed, line1.coords[0],line1.coords[1])
         new_end = project_along_line(ascent_time * target_speed, line1.coords[0],line1.coords[1])
         return LineString([new_start, new_end])
 
-    target_speed = line1.length() / (ascent_time + descent_time)
+    target_speed = line1.length / (ascent_time + descent_time)
     if target_speed > min_speed:
         new_start = project_along_line(descent_time * target_speed, line1.coords[0],line1.coords[1])
         new_end = project_along_line(ascent_time * target_speed, line1.coords[0],line1.coords[1])
@@ -73,77 +73,95 @@ def handle_canyon(line1, alt0, alt1, alt2, min_speed, climb_rate, descent_rate, 
     
 def handle_two_lines(line1, line2, alt1, alt2, min_speed, target_speed, climb_rate, descent_rate):
     vert_dist = abs(alt2 - alt1)
+    #ascent
     if alt2 > alt1:
         time = vert_dist / climb_rate
-        horiz = target * time
-        if horiz < line1.length():
+        horiz = target_speed * time
+        if horiz < line1.length:
             new_end = project_along_line(horiz, line1.coords[0],line1.coords[1])
-            return (LineString([line1.coords[0], new_start]), alt1), (line2, alt2)  
+            return (LineString([line1.coords[0], (new_end[0], new_end[1], 0)]), alt1), (line2, alt2)  
         else:
-            max_speed = line1.length() / time
+            max_speed = line1.length / time
             if max_speed > min_speed:
-                new_end = project_along_line(line1.length(), line1.coords[1], line1.coords[0])
-                line1 = LineString([line1.coords[0], new_end])
+                new_end = project_along_line(line1.length, line1.coords[1], line1.coords[0])
+                line1 = LineString([line1.coords[0], (new_end[0], new_end[1], 0)])
                 return (line1, alt1), (line2, alt2)
             else:
                 return (None, alt2), (line2, alt2)
+    #descent
     else:
         time = vert_dist / descent_rate
-        horiz = target * time
-        if horiz < line2.length():
+        horiz = target_speed * time
+        if horiz < line2.length:
             new_start = project_along_line(horiz, line2.coords[1],line2.coords[0])
-            return ((line1, alt1), (LineString(new_start, line2.coords[1]), alt2)) 
+            return ((line1, alt1), (LineString([(new_start[0], new_start[1], 0), line2.coords[1]]), alt2))
         else:
-            max_speed = line2.length() / time
+            max_speed = line2.length / time
             if max_speed > min_speed:
-                new_start = project_along_line(line2.length(), line2.coords[1], line2.coords[0])
-                line2 = LineString([new_start, line1.coords[1]])
+                new_start = project_along_line(line2.length, line2.coords[1], line2.coords[0])
+                line2 = LineString([(new_start[0], new_start[1], 0), line1.coords[1]])
+                return (line1, alt1), (line2, alt2)
             else:
                 return (line1, alt1), (None, alt1)
 
 def adjust_speed(lines, smooth_dict, min_speed, target_speed, climb_rate, descent_rate):
     new_lines = []
-    line0 = lines.pop(0)
     line1 = lines.pop(0)
+    line2 = lines.pop(0)
+    alt1 = smooth_dict[line1.wkt]
+    alt2 = smooth_dict[line2.wkt]
+
     while len(lines) > 0:
-        line2 = lines.pop(0)
-  
-        alt0 = smooth_dict[line0.wkt]
-        alt1 = smooth_dict[line1.wkt]
-        alt2 = smooth_dict[line2.wkt]
 
-        vert_dist = abs(curr_alt - prev_alt)
-        #-\_/- Only case that requires all 3 lines
-        if alt0 > alt1 and alt2 > alt1:
-            can = handle_canyon(line1, alt0, alt1, alt2, min_speed, climb_rate, descent_rate)
+        print(len(lines))
 
-            new_lines.append(line0)
-            if can:
-                new_lines.append(can)
+        vert_dist = abs(alt2 - alt1)
+        #descent
+        if alt1 > alt2:
+            (l1, a1), (l2, a2) = handle_two_lines(line1, line2, alt1, alt2, min_speed, target_speed, climb_rate, descent_rate)
 
-            line0 = line2
-            line1 = lines.pop(0)
-            line2 = None
+            if l2 == None:
+                popped = lines.pop(0)
+                line2 = LineString(line2.coords[1], popped.coords[1])
+                alt2 = smooth_dict[popped.wkt]
+            else:
+                new_lines.append(l1)
+                smooth_dict[l1.wkt] = a1
+                line1 = l2
+                line2 = lines.pop(0)
+
+                alt1 = alt2
+                alt2 = smooth_dict[line2.wkt]
+
         #ascent
         else:
             (l1, a1), (l2, a2) = handle_two_lines(line1, line2, alt1, alt2, min_speed, target_speed, climb_rate, descent_rate)
 
-            if l1 != None:
+            if l1 == None:
+                time = abs(alt1-alt2) / climb_rate
+                accum_len = line1.length
+                max_speed = line1.length / time
+                while max_speed < min_speed:
+                    back = new_lines.pop()
+                    last_acc = accum_len
+                    accum_len += back.length
+                    max_speed = accum_len / time
+                line1 = line2
+                line2 = lines.pop(0)
+            else:
                 new_lines.append(l1)
+                smooth_dict[l1.wkt] = a1
+                line1 = line2
+                line2 = lines.pop(0)
+                alt1 = alt2
+                alt2 = smooth_dict[line2.wkt]
 
-            if l2 != None:
-                new_lines.append(l2)
-
-            line0 = line2
-            line1 = lines.pop(0)
-
-    
-    return new_lines
+    return new_lines, smooth_dict
             
 
 
 def smooth_segments(start, segments, seg_dict, min_length):
-    print("smoothing a segment")
+    print("smoothing a segment", min_length)
     sorted_segs = list(sorted(segments, key=lambda x: distance(start, x.coords[0])))
     smooth_dict = dict(seg_dict)
 
@@ -152,45 +170,48 @@ def smooth_segments(start, segments, seg_dict, min_length):
 
         master_list, accum_list, dist = acc
         
-        total_dist = nxt.length() + dist
+        accum_list.append(nxt)
+        total_dist = nxt.length + dist
         if total_dist >= min_length:
             start_coord = accum_list[0].coords[0]
 
+            line = accum_list.pop()
             if total_dist >= min_length:
                 dx = line.coords[1][0] - line.coords[0][0]
                 dy = line.coords[1][1] - line.coords[0][1]
                 norm = (dx**2 + dy**2)**.5
                 dx = (dx / norm) * (min_length - dist)
                 dy = (dy / norm) * (min_length - dist)
-                end_coord = (line.coords[0][0] + dx, line.coords[0][1] + dy)
+                end_coord = (line.coords[0][0] + dx, line.coords[0][1] + dy, 0)
                 ls = LineString([start_coord, end_coord])
-                smooth_dict[ls.wkt] = max(*[smooth_dict[x.wkt] for (x,dist) in accum_list], smooth_dict[line.wkt])
+                smooth_dict[ls.wkt] = max([smooth_dict[line.wkt]]+[smooth_dict[x.wkt] for x in accum_list])
 
                 master_list.append(ls)
                     
                 remainder = LineString([end_coord, line.coords[1]])
                 smooth_dict[remainder.wkt] = smooth_dict[line.wkt]
 
-                if remainder.length() >= min_length:
+                accum_list.clear()
+                if remainder.length >= min_length:
                     master_list.append(remainder)
                     dist = 0
-                elif remainder.length() > 0:
+                elif remainder.length > 0:
                     accum_list.append(remainder)
-                    dist = remainder.length()
+                    dist = remainder.length
         else:
             accum_list.append(nxt)
-            dist += nxt.length()
+            dist += nxt.length
 
         return master_list, accum_list, dist    
 
     (smooth_lines, _, _) = tuple(reduce(reducer, sorted_segs, ([], [], 0)))
-    return smooth_lines
+    return smooth_lines, smooth_dict
 
-def lines_to_coords(self, lines, smooth_dict):
+def lines_to_coords(lines, smooth_dict):
     coords = []
 
     for line in lines:
-        for (x,y) in line.coords:
+        for (x,y,z) in line.coords:
             coords.append((x, y, smooth_dict[line.wkt]))
 
     return coords
@@ -218,7 +239,7 @@ def resolve_two_dicts(canopies, lines, canopy_dict, int_dict):
 #   strtree: STRtree containing the topology of the area to explore
 #   alt_dict: dict mapping shapely wkt to altitude
 #   buffer: number representing how close we need to be to intersect
-def plan_path(path, strtree, alt_dict, be_buffer, obs_buffer, min_alt_change, climb_rate, descent_rate, max_speed, canopy_strtree=None, canopy_alt_dict=None):
+def plan_path(path, strtree, alt_dict, be_buffer, obs_buffer, min_alt_change, climb_rate, descent_rate, max_speed, min_speed, canopy_strtree=None, canopy_alt_dict=None):
     segments = []
     print(path)
     for i in range(1, len(path)):
@@ -256,10 +277,12 @@ def plan_path(path, strtree, alt_dict, be_buffer, obs_buffer, min_alt_change, cl
         obs_for_graph.extend(list(sorted(lines, key=lambda x:distance(seg[0], x.coords[0]))))
         lines, smooth_dict = smooth_segments(seg[0], lines, int_dict, min_alt_change)
 
+        lines, smooth_dict = adjust_speed(lines, smooth_dict, min_speed, max_speed, climb_rate, descent_rate)
+
         points = []
         for i in range(1, len(lines)):
-            line1 = lines[0]
-            line2 = lines[1]
+            line1 = lines[i-1]
+            line2 = lines[i]
   
             curr_alt = smooth_dict[line2.wkt]
             prev_alt = smooth_dict[line1.wkt]
@@ -268,23 +291,27 @@ def plan_path(path, strtree, alt_dict, be_buffer, obs_buffer, min_alt_change, cl
             if curr_alt > prev_alt:
                 dx = line1.coords[0][0] - line1.coords[1][0] 
                 dy = line1.coords[0][1] - line1.coords[1][1] 
-
+                norm = (dx**2 + dy**2)**.5
+                dx = (dx / norm) * be_buffer if norm != 0 else 0
+                dy = (dy / norm) * be_buffer if norm != 0 else 0
+                mid = line1.coords[1][0] + dx, line2.coords[1][1] + dy
             #descent
             else:
-                dx = line2.coords[0][0] - line1.coords[1][0] 
-                dy = line2.coords[0][1] - line1.coords[1][1] 
+                dx = line2.coords[1][0] - line1.coords[1][0] 
+                dy = line2.coords[1][1] - line1.coords[1][1] 
+                norm = (dx**2 + dy**2)**.5
+                dx = (dx / norm) * be_buffer if norm != 0 else 0
+                dy = (dy / norm) * be_buffer if norm != 0 else 0
+                mid = line2.coords[1][0] + dx, line2.coords[1][1] + dy
+    
 
-            norm = (dx**2 + dy**2)**.5
-            dx = (dx / norm) * be_buffer
-            dy = (dy / norm) * be_buffer
-
-            points.append((line1.coords[1][0] + dx, line1.coords[1][1] + dy, prev_alt))
-            points.append((line1.coords[1][0] + dx, line1.coords[1][1] + dy, curr_alt))
+            points.append((mid[0], mid[1], prev_alt))
+            points.append((mid[0], mid[1], curr_alt))
 
 
 
         last_alt = smooth_dict[lines[-1].wkt]
-        points.append((lines[-1].coords[1][0], lines[-1].coords[1][1], last_alt, max_speed))
+        points.append((lines[-1].coords[1][0], lines[-1].coords[1][1], last_alt))
         new_path.extend(points)
 
     new_obs = []

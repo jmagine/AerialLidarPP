@@ -6,6 +6,7 @@ def distance(p1, p2):
     return ((p1[0]-p2[0])**2 + (p1[1]-p2[1])**2)**.5
 
 def read_init_path(filepath, proj=None):
+    print(filepath)
     miss_dict = json.load(open(filepath))
 
     tups = []
@@ -23,10 +24,14 @@ def read_init_path(filepath, proj=None):
 #Also does projection
 def save_path(filepath, path, proj):
     arr = []
-    for lon, lat, alt, speed in path:
+    for stuff in path:
+        print(stuff)
+        lon, lat, alt = stuff
         if proj != None:
             lon, lat, alt = pyproj.transform(proj, wgs84, lon, lat, alt)
-        new_dict = {'latitude' : lat, 'longitude' : lon, 'altitude' : alt * .3048, 'speed':speed}
+        else:
+            lat, lon = lon, lat
+        new_dict = {'latitude' : lat, 'longitude' : lon, 'altitude' : alt * .3048}
         arr.append(new_dict)
 
     json.dump(arr, open(filepath, 'w'))

@@ -16,16 +16,16 @@ from pathplan.evaluation import calculate_intersections, mse, print_comparison_i
 
 #returns path json, alt file, shapefile, and tif
 def load_test_case(case_file):
-    test_dict = json.load(case_file)
+    test_dict = json.load(open(case_file))
     path, pro = read_init_path(test_dict['path'])
     tif = read_tif(test_dict['tif'])
     if "shapes" not in test_dict:
-        test_dict['shapes'] = "gen/shapes/{0}.shapes".format(case_name)
-        test_dict['alts'] = "gen/shapes/{0}.alt.json".format(case_name)
-        save_test_case(case_name,test_dict)
+        test_dict['shapes'] = "gen/shapes/{0}.shapes".format(splitext(case_file)[0])
+        test_dict['alts'] = "gen/shapes/{0}.alt.json".format(splitext(case_file)[0])
+        save_test_case(case_file,test_dict)
 
         vecs = vectorize_raster(test_dict['tif'])
-        shapes, alt = shapelify_vectors(vecs, test_dict['proj'])
+        shapes, alt = shapelify_vector(vecs, test_dict['proj'])
         binary = dumps(MultiPolygon(shapes))
 
         with open(test_dict['shapes'], "wb") as wkb_file:
@@ -39,14 +39,17 @@ def load_test_case(case_file):
 
     return path, alt, shapes, tif, pro, test_dict
 
-def generate_path(case_file, path_name, params): 
-    path, alt, shapes, tif, pro, test_case = load_test_case(case_name)
+def generate_path(case_file, path_name, params_file): 
+    path, alt, shapes, tif, pro, test_case = load_test_case(case_file)
+    params = json.load(open(params_file))
     tree = STRtree(shapes)
 
-    gen_path, lines = plan_path(path, tree, alt, params['be_buffer'],params['obs_buffer'], params['min_alt_change'], params['climb_rate'], params['descent_rate'], params['max_speed']) 
+    case_name = basename(splitext(case_file)[0])
+
+    gen_path, lines = plan_path(path, tree, alt, params['be_buffer'],params['obs_buffer'], params['min_length'], params['climb_rate'], params['descent_rate'], params['max_speed'], params['min_speed']) 
 
     lines_file = 'tests/lines/{0}.json'.format(case_name)
-    json.dump(lines, open('tests/lines/{0}.json'.format(case_name), 'w'))
+    json.dump(lines, open(lines_file, 'w'))
 
     test_case['lines'] = lines_file
 
@@ -55,9 +58,12 @@ def generate_path(case_file, path_name, params):
     test_case['results'][path_name] = {}
     test_case['results'][path_name]['gen-path'] = path_loc
     test_case['results'][path_name]['params'] = params_file
-    save_test_case(case_name,test_case)
+    save_test_case(case_file,test_case)
+
+    return gen_path
 
 def save_test_case(case_name, test_dict):
+    print(case_name, "case name")
     json.dump(test_dict, open(case_name, "w"))
 
 
@@ -236,7 +242,7 @@ if __name__ == '__main__':
                         params = {}
                         params['be_buffer'] = float(input("Enter distance from bare earth: "))
                         params['obs_buffer'] = float(input("Enter distance from surfaces: ")) 
-                        params['min_alt_change'] = float(input("Enter min alt change: "))
+                        params['min_length'] = float(input("Enter min alt change: "))
                         params['climb_rate'] = float(input("Enter climb_rate: ")) 
                         params['descent_rate'] = float(input("Enter descent rate: "))
                         params['max_speed'] = float(input("Enter maximum horizontal speed: "))

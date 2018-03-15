@@ -24,7 +24,7 @@ def build_distance_lists(tups):
 #Lines: tuple ((x1, y1), (x2, y2)) mapped to a list of LineStrings
 # Each path is a tuple mapped to a list of LineStrings
 # Plots distance along the path vs Z
-def plot2d(lines, *paths, *kwargs): 
+def plot2d(lines, *paths, **kwargs): 
   
   surf_name, lines = lines
   lines_graph_x = [0]
@@ -44,7 +44,7 @@ def plot2d(lines, *paths, *kwargs):
       print("plotting path {0}".format(name))
       path_x, path_y = build_distance_lists(path)
 
-      ax.plot(path_x, path_y, label=name)
+      ax.plot(path_x, path_y, label=name, color='b')
 
       if 'scatter' in kwargs and kwargs['scatter']:
           ax.scatter(path_x, path_y, color='g')
@@ -53,8 +53,8 @@ def plot2d(lines, *paths, *kwargs):
   
   ax.set_xlabel("Distance Along Path (feet)")
   ax.set_ylabel("Altitude (feet)")
-  plt.legend(loc='bottom left')
-  plt.show()
+  #plt.legend(loc='bottom left')
+  #plt.show()
 
 import rasterio
 def plot3d(image, raster, proj, *paths):

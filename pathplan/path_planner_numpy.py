@@ -9,7 +9,10 @@
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
+from geo import read_tif
+from utils import save_path
 
+import json
 import numpy as np
 from PIL import Image
 from math import hypot
@@ -17,7 +20,8 @@ from math import hypot
 '''[Config vars]------------------------------------------------------------'''
 #RASTER_FILE = "../tests/images/sine-0.1f-20a.tif"
 RASTER_FILE = "../tests/images/ucsd-dsm.tif"
-HEIGHT_TOL = 3
+HEIGHT_TO_BARE = 3
+HEIGHT_TO_CANOPY = 3
 PATH_SPACING = 0.5
 
 '''[gen_path]------------------------------------------------------------------
@@ -28,7 +32,7 @@ PATH_SPACING = 0.5
   waypoints - list of waypoints to hit with path
   return - list of points in x,y,z coordinates representing revised waypoints
 ----------------------------------------------------------------------------'''
-def gen_path(surface_raster, waypoints):
+def gen_path(surface_raster, canopy_raster, waypoints):
 
   #path_points = []
   x_points = []
@@ -39,7 +43,7 @@ def gen_path(surface_raster, waypoints):
     return x_points, y_points, z_points
 
   for i in range(len(waypoints) - 1):
-    x, y, z = gen_segment(surface_raster, waypoints[i], waypoints[i + 1])
+    x, y, z = gen_segment(surface_raster, canopy_raster, waypoints[i], waypoints[i + 1])
     x_points.extend(x)
     y_points.extend(y)
     z_points.extend(z)
@@ -55,7 +59,7 @@ def gen_path(surface_raster, waypoints):
   wp1 - dest waypoint
   return - list of x, y, z points interpolated between two waypoints
 ----------------------------------------------------------------------------'''
-def gen_segment(surface_raster, wp0, wp1):
+def gen_segment(surface_raster, canopy_raster, wp0, wp1):
   src_x = wp0[0]
   src_y = wp0[1]
 
@@ -82,12 +86,13 @@ def gen_segment(surface_raster, wp0, wp1):
 
   while curr_dist < seg_dist:
     # calculate avoid height (can also utilize bare earth model in future)
-    avoid_height = HEIGHT_TOL
+    avoid_height = HEIGHT_TO_BARE
+    canopy_avoid = HEIGHT_TO_CANOPY
 
     # stay the designated height above the surface model
     x_points.append(x)
     y_points.append(y)
-    z_points.append(surface_raster[int(y)][int(x)] + avoid_height)
+    z_points.append(max(surface_raster[int(y)][int(x)] + avoid_height, canopy_raster[int(y)][int(x)] + canopy_avoid))
     #points.append([x, y, surface_raster[int(y)][int(x)] + avoid_height])
 
     x += delta_x * PATH_SPACING / seg_dist
@@ -95,7 +100,7 @@ def gen_segment(surface_raster, wp0, wp1):
     curr_dist += PATH_SPACING
 
   # calculate avoid height
-  avoid_height = HEIGHT_TOL
+  avoid_height = HEIGHT_TO_BARE
   
   x_points.append(dest_x)
   y_points.append(dest_y)
@@ -260,11 +265,11 @@ def smooth_line(points, max_height_diff):
   
 import rasterio
 import pyproj
-def plan_path(init_waypoints, tiffile, smoothing_params=[10, 0.5]):
+def plan_path(init_waypoints, bare_earth, canopy,  smoothing_params=[10, 0.5]):
   #[TODO] read waypoints from file
   #waypoints = [(0,0), (199, 199), (0, 199), (199, 0)]
 
-  raster = rasterio.open(tiffile)
+  raster = rasterio.open(bare_earth)
 
   raster_proj = pyproj.Proj(raster.crs)
 
@@ -285,11 +290,15 @@ def plan_path(init_waypoints, tiffile, smoothing_params=[10, 0.5]):
   #plt.imshow(image)
   #plt.show()
   
-  image = read_tif(tiffile)
+  image = read_tif(bare_earth)
+  print(image)
+  print(image.shape)
+
+  canopy = read_tif(canopy)
   print(image)
   print(image.shape)
   
-  packed_waypoints = gen_path(image, waypoints)
+  packed_waypoints = gen_path(image, canopy, waypoints)
   print(packed_waypoints)
   x, y, z = packed_waypoints
 
@@ -306,15 +315,17 @@ def plan_path(init_waypoints, tiffile, smoothing_params=[10, 0.5]):
 
 import sys
 if __name__ == '__main__':
-  if len(sys.argv) < 3:
+  if len(sys.argv) < 4:
     print("not enough arguments")
     sys.exit() 
   
-  tiffile = sys.argv[1]
-  path_file = sys.argv[2]
+  bare_earth = sys.argv[1]
+  canopy = sys.argv[2]
+  path_file = sys.argv[3]
   
+  print(path_file)
   path = [(x['latitude'], x['longitude']) for x in json.load(open(path_file))]
   
-  new_path = plan_path(path, tiffile)
+  new_path = plan_path(path, bare_earth, canopy)
 
-  save_path([{'latitude':lat, 'longitude':lon, 'altitude':alt} for (lat,lon,alt) in new_path], 'numpy_path.json')
+  save_path('numpy_path.json', new_path,  None)
