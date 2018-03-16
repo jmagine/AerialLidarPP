@@ -78,9 +78,12 @@ def read_tif(filename):
   #i_w = image.shape[0]
   #i_h = image.shape[1]
   #image = image.flatten().reshape((i_w, i_h))
-  image = Image.open(filename).convert('L')
-  image = np.array(image)
-  return image
+  print(filename)
+  raster = rasterio.open(filename)
+
+  print(raster.crs)
+  
+  return raster.read(), pyproj.Proj(raster.crs, preserve_units=True)
 
 
 def proj_utm(zone, north):
@@ -96,7 +99,7 @@ def proj_utm(zone, north):
     ref = "+proj=utm +zone=%d +ellps=WGS84" % zone
     if not north:
         ref += " +south"
-    return pyproj.Proj(ref)
+    return pyproj.Proj(ref, preserve_units=True)
 
 
 def utm_proj(lat, lon):
@@ -129,17 +132,25 @@ def vectorize_raster(rasterfile):
     return list(results)
 
 
-def shapelify_vector(vectors, do_transform=True):
+def shapelify_vector(vectors, do_transform=True, crs=None, proj=None):
     alt_dict = {}
     shapes = []
 
     #lol at the way that works
     lon, lat = vectors[0]['geometry']['coordinates'][0][0]
 
-    proj = utm_proj(lat, lon)
+    print(lon)
+    print(lat)
+
+    if proj == None:
+        proj = utm_proj(lat, lon)
+
+    if crs == None:
+        crs = wgs84
 
     def transform_to_proj(x, y, z=None):
-        return pyproj.transform(wgs84, proj, x, y, z)
+        return pyproj.transform(crs, proj, x, y, z)
+
 
     init_time = time.time()
     for vec in vectors:

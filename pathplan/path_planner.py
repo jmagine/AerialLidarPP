@@ -9,6 +9,7 @@ from shapely.strtree import STRtree
 from shapely.wkb import dumps
 
 from pathplan.utils import read_init_path, distance
+from pathplan.path_planner_numpy import smooth_line
 
 
 import json
@@ -19,12 +20,13 @@ import time
 import sys
 
 def get_intersection_map(strtree, alt_dict, segment, buf):
+    print(segment)
     ls = LineString(segment)
     query_start = time.time()
     intersecting = list(strtree.query(ls))
     #query_time += time.time() - query_start
  
-    #print("R Tree query returns {0} intersections".format(len(intersecting)))
+    print("R Tree query returns {0} intersections".format(len(intersecting)))
     inter_start = time.time()
     int_dict = {}
     lines = []
@@ -175,36 +177,42 @@ def smooth_segments(start, segments, seg_dict, min_length):
         if total_dist >= min_length:
             start_coord = accum_list[0].coords[0]
 
-            line = accum_list.pop()
             if total_dist >= min_length:
-                dx = line.coords[1][0] - line.coords[0][0]
-                dy = line.coords[1][1] - line.coords[0][1]
-                norm = (dx**2 + dy**2)**.5
-                dx = (dx / norm) * (min_length - dist)
-                dy = (dy / norm) * (min_length - dist)
-                end_coord = (line.coords[0][0] + dx, line.coords[0][1] + dy, 0)
+                #dx = line.coords[1][0] - line.coords[0][0]
+                #dy = line.coords[1][1] - line.coords[0][1]
+                #norm = (dx**2 + dy**2)**.5
+                #dx = (dx / norm) * (min_length - dist)
+                #dy = (dy / norm) * (min_length - dist)
+                #end_coord = (line.coords[0][0] + dx, line.coords[0][1] + dy, 0)
+                end_coord = nxt.coords[-1]
                 ls = LineString([start_coord, end_coord])
-                smooth_dict[ls.wkt] = max([smooth_dict[line.wkt]]+[smooth_dict[x.wkt] for x in accum_list])
+                smooth_dict[ls.wkt] = max([smooth_dict[x.wkt] for x in accum_list])
 
                 master_list.append(ls)
-                    
-                remainder = LineString([end_coord, line.coords[1]])
-                smooth_dict[remainder.wkt] = smooth_dict[line.wkt]
+                accum_list = []
+                dist = 0
+                #remainder = LineString([end_coord, line.coords[1]])
+                #smooth_dict[remainder.wkt] = smooth_dict[line.wkt]
 
-                accum_list.clear()
-                if remainder.length >= min_length:
-                    master_list.append(remainder)
-                    dist = 0
-                elif remainder.length > 0:
-                    accum_list.append(remainder)
-                    dist = remainder.length
+                #accum_list.clear()
+                #if remainder.length >= min_length:
+                #    master_list.append(remainder)
+                #    dist = 0
+                #    assert len(accum_list) == 0
+                #elif remainder.length > 0:
+                #    accum_list.append(remainder)
+                #    assert len(accum_list) == 1
+                #    dist = remainder.length
         else:
             accum_list.append(nxt)
             dist += nxt.length
 
         return master_list, accum_list, dist    
 
-    (smooth_lines, _, _) = tuple(reduce(reducer, sorted_segs, ([], [], 0)))
+    (smooth_lines, accum, _) = tuple(reduce(reducer, sorted_segs, ([], [], 0)))
+    if len(accum) > 0:
+        smooth_lines.append(LineString([accum[0].coords[0], accum[-1].coords[1]]))
+        smooth_dict[smooth_lines[-1].wkt] = max([smooth_dict[x.wkt] for x in accum]) 
     return smooth_lines, smooth_dict
 
 def lines_to_coords(lines, smooth_dict):
@@ -239,8 +247,9 @@ def resolve_two_dicts(canopies, lines, canopy_dict, int_dict):
 #   strtree: STRtree containing the topology of the area to explore
 #   alt_dict: dict mapping shapely wkt to altitude
 #   buffer: number representing how close we need to be to intersect
-def plan_path(path, strtree, alt_dict, be_buffer, obs_buffer, min_alt_change, climb_rate, descent_rate, max_speed, min_speed, canopy_strtree=None, canopy_alt_dict=None):
+def plan_path(path, strtree, alt_dict, be_buffer, obs_buffer, min_alt_change, climb_rate, descent_rate, speed, canopy_strtree=None, canopy_alt_dict=None):
     segments = []
+    min_height = be_buffer
     print(path)
     for i in range(1, len(path)):
         segments.append((path[i-1], path[i]))
@@ -277,41 +286,19 @@ def plan_path(path, strtree, alt_dict, be_buffer, obs_buffer, min_alt_change, cl
         obs_for_graph.extend(list(sorted(lines, key=lambda x:distance(seg[0], x.coords[0]))))
         lines, smooth_dict = smooth_segments(seg[0], lines, int_dict, min_alt_change)
 
-        lines, smooth_dict = adjust_speed(lines, smooth_dict, min_speed, max_speed, climb_rate, descent_rate)
+        print(lines)
 
-        points = []
-        for i in range(1, len(lines)):
-            line1 = lines[i-1]
-            line2 = lines[i]
-  
-            curr_alt = smooth_dict[line2.wkt]
-            prev_alt = smooth_dict[line1.wkt]
+        #lines, smooth_dict = adjust_speed(lines, smooth_dict, min_speed, max_speed, climb_rate, descent_rate)
 
-            #Ascent
-            if curr_alt > prev_alt:
-                dx = line1.coords[0][0] - line1.coords[1][0] 
-                dy = line1.coords[0][1] - line1.coords[1][1] 
-                norm = (dx**2 + dy**2)**.5
-                dx = (dx / norm) * be_buffer if norm != 0 else 0
-                dy = (dy / norm) * be_buffer if norm != 0 else 0
-                mid = line1.coords[1][0] + dx, line2.coords[1][1] + dy
-            #descent
-            else:
-                dx = line2.coords[1][0] - line1.coords[1][0] 
-                dy = line2.coords[1][1] - line1.coords[1][1] 
-                norm = (dx**2 + dy**2)**.5
-                dx = (dx / norm) * be_buffer if norm != 0 else 0
-                dy = (dy / norm) * be_buffer if norm != 0 else 0
-                mid = line2.coords[1][0] + dx, line2.coords[1][1] + dy
-    
+        line = lines[0]
+        x,y,z = line.coords[-1]
+        z = smooth_dict[line.wkt]
+        points = [(x,y,z)]
+        for line in lines:
+            x,y,z = line.coords[-1]
+            z = smooth_dict[line.wkt]
+            points.append((x, y, z))
 
-            points.append((mid[0], mid[1], prev_alt))
-            points.append((mid[0], mid[1], curr_alt))
-
-
-
-        last_alt = smooth_dict[lines[-1].wkt]
-        points.append((lines[-1].coords[1][0], lines[-1].coords[1][1], last_alt))
         new_path.extend(points)
 
     new_obs = []

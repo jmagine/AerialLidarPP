@@ -39,6 +39,7 @@ def plot2d(lines, *paths, **kwargs):
   lines_graph_x, lines_graph_y = build_distance_lists(lines)
 
   ax.plot(lines_graph_x, lines_graph_y, label=surf_name, color='r')
+  #ax.scatter(lines_graph_x, lines_graph_y, label=surf_name, color='g')
   
   for (name,path) in paths:
       print("plotting path {0}".format(name))
@@ -46,7 +47,7 @@ def plot2d(lines, *paths, **kwargs):
 
       ax.plot(path_x, path_y, label=name, color='b')
 
-      if 'scatter' in kwargs and kwargs['scatter']:
+      if 'scatter' not in kwargs: #and kwargs['scatter']:
           ax.scatter(path_x, path_y, color='g')
    
   

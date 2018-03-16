@@ -7,22 +7,15 @@ from PyQt5.QtWidgets import QWidget, QGridLayout, QPushButton, QApplication, QLi
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from pathplan.path_planner import plan_path
+from pathplan.utils import save_path
 from pathplan.viz import plot2d
 from main import generate_path, create_test_case, load_test_case
 import json
-
-#class TestCaseLoader(QWidget):
-#
-#    def __init__(self):
-#        super(TestCaseLoader, self).__init__()
-
 
 class Gui(QWidget):
 
     def __init__(self):
         super(Gui, self).__init__()
-        #Of the form {'path_name': {'param':val}}
-
         #TODO Set to some default params
         self.default_params = 'tests/params/base.json'
         self.current_params = json.load(open(self.default_params))
@@ -34,18 +27,21 @@ class Gui(QWidget):
         self.plotter = FigureCanvas(self.fig)
 
 
+        self.surface = None
+        self.load_lines()
         self.init_ui()
         print(self.paths, "self.paths")
         print(self.current_paths, "self.current_paths")
         print(self.params, "self.params")
 
     def load_lines(self):
-        _,_,_,_,_, self.tc = load_test_case(self.test_case)
-        return json.load(open(self.tc['lines']))
+        _,_,_,_,self.proj, self.tc = load_test_case(self.test_case)
+        self.surface = json.load(open(self.tc['lines']))
 
     def change_selected_paths(self):
         selected_items = self.path_list.selectedItems()
         self.current_paths = []
+
         for item in selected_items:
             text = str(item.text())
             self.current_paths.append((text, self.paths[text]))
@@ -81,7 +77,9 @@ class Gui(QWidget):
             vbox.addWidget(slider)
 
     def get_special_path(self, name):
-        return self.load_lines()
+        if self.surface == None:
+            return self.load_lines()
+        return self.surface
         
 
     def reset_plots(self):
@@ -165,7 +163,10 @@ class Gui(QWidget):
         path_name = 'path-{0}'.format(len(self.paths))
         filename = 'tests/params/{0}.json'.format(path_name)
         json.dump(parms, open(filename, 'w'))
+        path_file = 'tests/gen-paths/{0}.json'.format(path_name)
         self.paths[path_name] = generate_path(self.test_case, 'test path', filename)
+        save_path(path_file, self.paths[path_name],self.proj)
+        json.dump(self.paths[path_name], open(path_file, 'w'))
         self.params[path_name] = parms
         self.path_list.addItem(path_name)
        

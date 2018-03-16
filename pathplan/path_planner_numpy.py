@@ -9,8 +9,8 @@
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
-from geo import read_tif
-from utils import save_path
+from pathplan.geo import read_tif, wgs84
+from pathplan.utils import save_path
 
 import json
 import numpy as np
@@ -19,14 +19,12 @@ from math import hypot
 
 '''[Config vars]------------------------------------------------------------'''
 #RASTER_FILE = "../tests/images/sine-0.1f-20a.tif"
-RASTER_FILE = "../tests/images/ucsd-dsm.tif"
+RASTER_FILE = "../tests/images/black-mountain.tif"
 HEIGHT_TO_BARE = 3
 HEIGHT_TO_CANOPY = 3
 PATH_SPACING = 0.5
 
-'''[gen_path]------------------------------------------------------------------
-  Adjusts waypoints as necessary to place them over surface model in raster,
-  and then interpolates values between raster.
+'''[gen_path]------------------------------------------------------------------ Adjusts waypoints as necessary to place them over surface model in raster, and then interpolates values between raster.
   
   surface_raster - raster image containing surface map
   waypoints - list of waypoints to hit with path
@@ -102,6 +100,7 @@ def gen_segment(surface_raster, canopy_raster, wp0, wp1):
   # calculate avoid height
   avoid_height = HEIGHT_TO_BARE
   
+  print(surface_raster.shape)
   x_points.append(dest_x)
   y_points.append(dest_y)
   z_points.append(surface_raster[int(dest_y)][int(dest_x)] + avoid_height)
@@ -265,13 +264,18 @@ def smooth_line(points, max_height_diff):
   
 import rasterio
 import pyproj
-def plan_path(init_waypoints, bare_earth, canopy,  smoothing_params=[10, 0.5]):
+def plan_path(init_waypoints, bare_earth, canopy,  proj=wgs84,smoothing_params=[10, 0.5]):
   #[TODO] read waypoints from file
   #waypoints = [(0,0), (199, 199), (0, 199), (199, 0)]
 
   raster = rasterio.open(bare_earth)
+  print(raster.affine) 
 
-  raster_proj = pyproj.Proj(raster.crs)
+  raster_proj = pyproj.Proj(raster.crs, preserve_units=True)
+
+  print(raster.bounds)
+  print("top lef", pyproj.transform(raster_proj, proj, raster.bounds.left, raster.bounds.top))
+  print("bottom right", pyproj.transform(raster_proj, wgs84, raster.bounds.right, raster.bounds.bottom))
 
   raster_width = abs(raster.bounds.right - raster.bounds.left)
   raster_height = abs(raster.bounds.top - raster.bounds.bottom)
@@ -280,8 +284,10 @@ def plan_path(init_waypoints, bare_earth, canopy,  smoothing_params=[10, 0.5]):
   waypoints = []
 
   for waypoint in init_waypoints:
-    x = int((abs(waypoint[0] - raster.bounds.bottom) / raster_height) * raster.height)
-    y = int((abs(waypoint[1] - raster.bounds.left) / raster_width) * raster.width)
+    print(waypoint)
+    x,y = pyproj.transform(proj, raster_proj, waypoint[0], waypoint[1])
+    print("transformed",(x,y))
+    x,y = raster.index(x, y)
     waypoints.append((x, y))
 
 
@@ -290,20 +296,22 @@ def plan_path(init_waypoints, bare_earth, canopy,  smoothing_params=[10, 0.5]):
   #plt.imshow(image)
   #plt.show()
   
-  image = read_tif(bare_earth)
+  image, crs = read_tif(bare_earth)
+  image = image[0,:,:]
   print(image)
   print(image.shape)
 
-  canopy = read_tif(canopy)
-  print(image)
-  print(image.shape)
+  canopy, cs = read_tif(canopy)
+  canopy = canopy[0,:,:]
+  print(canopy)
+  print(canopy.shape)
   
   packed_waypoints = gen_path(image, canopy, waypoints)
   print(packed_waypoints)
   x, y, z = packed_waypoints
 
-  for smooth_param in smoothing_params:
-    z = smooth_line(z, smooth_param) 
+  #for smooth_param in smoothing_params:
+  #  z = smooth_line(z, smooth_param) 
 
   points = []
 

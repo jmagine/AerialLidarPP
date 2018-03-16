@@ -68,6 +68,52 @@ def parse_bins(logs):
 
     return path
 
+def get_command_list(mission, tif):
+
+    home_pos_alt = mission[0]
+    raster = rasterio.open(tif)
+
+    raster_proj = pyproj.Proj(raster.crs, preserve_units=True)
+
+    lat = mission[0]['latitude']
+    lon = mission[0]['longitude']
+
+    proj = utm_proj(32.989613, -117.128693)
+    lon,lat = pyproj.transform(wgs84, raster_proj, lon, lat)
+
+    print(lon,lat)
+    row, col = raster.index(lon, lat)
+
+    print(row, col)
+
+    data = raster.read()[0,:,:]
+    home_pos_alt = data[row][col] * .3048
+
+    nav_type = mavutil.mavlink.MAV_CMD_NAV_WAYPOINT
+    cmd = Command(0, 0, 0, mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT, nav_type, 0, 0, 0, 0, 0, 0, lat, lon, home_pos_alt)
+
+    cmds = [cmd]
+
+    
+    for cmd in mission:
+        lat = cmd['latitude']
+        lon = cmd['longitude']
+        #lat,lon,alt = cmd
+        #lon, lat = pyproj.transform(proj, wgs84, lat, lon)
+        #nav_type = cmd['type']
+        #if nav_type == 'takeoff':
+        #    nav_type = mavutil.mavlink.MAV_CMD_NAV_TAKEOFF
+        #elif nav_type == 'landing':
+        #    nav_type = mavutil.mavlink.MAV_CMD_NAV_WAYPOINT
+        #else:
+
+        nav_type = mavutil.mavlink.MAV_CMD_NAV_WAYPOINT
+    
+        cmd = Command(0, 0, 0, mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT, nav_type, 0, 0, 0, 0, 0, 0, lat, lon, home_pos_alt + 20)
+        cmds.append(cmd)
+
+    return cmds
+
 def fly(port, missionfile, logdir):
     time.sleep(10)
     
@@ -86,20 +132,6 @@ def fly(port, missionfile, logdir):
     
     mission = json.load(open(missionfile))
     
-    for cmd in mission:
-        lat = cmd['latitude']
-        lon = cmd['longitude']
-        alt = cmd['altitude']
-        #nav_type = cmd['type']
-        #if nav_type == 'takeoff':
-        #    nav_type = mavutil.mavlink.MAV_CMD_NAV_TAKEOFF
-        #elif nav_type == 'landing':
-        #    nav_type = mavutil.mavlink.MAV_CMD_NAV_WAYPOINT
-        #else:
-        nav_type = mavutil.mavlink.MAV_CMD_NAV_WAYPOINT
-    
-        cmd = Command(0, 0, 0, mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT, nav_type, 0, 0, 0, 0, 0, 0, lat, lon, alt)
-        cmds.add(cmd)
     
     cmds.upload()
     
@@ -209,3 +241,33 @@ def fly(port, missionfile, logdir):
     sh.rmtree("terrain")
     
     return logdir
+
+def save_mission(aFileName, cmds):
+    """
+    Save a mission in the Waypoint file format (http://qgroundcontrol.org/mavlink/waypoint_protocol#waypoint_file_format).
+    """
+    output='QGC WPL 110\n'
+    for cmd in cmds:
+        commandline="%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" % (cmd.seq,cmd.current,cmd.frame,cmd.command,cmd.param1,cmd.param2,cmd.param3,cmd.param4,cmd.x,cmd.y,cmd.z,cmd.autocontinue)
+        output+=commandline
+    with open(aFileName, 'w') as file_:
+        file_.write(output)
+
+import sys
+from os.path import splitext, basename
+if __name__ == '__main__':
+    import rasterio
+    import pyproj
+    from geo import wgs84, utm_proj
+    if len(sys.argv) != 3:
+        print("need a tiffile and a path file")
+        sys.exit()
+
+    tiffile = sys.argv[1]
+    missionfile = sys.argv[2]
+    mission = json.load(open(missionfile))
+
+    filename = "{0}.txt".format(basename(splitext(missionfile)[0]))
+
+    cmds = get_command_list(mission, tiffile)
+    save_mission(filename,cmds)
