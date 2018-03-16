@@ -10,6 +10,7 @@ from shapely.wkb import dumps
 
 from pathplan.utils import read_init_path, distance
 from pathplan.path_planner_numpy import smooth_line
+from pathplan.smoothing import concavity_smooth
 
 
 import json
@@ -22,12 +23,12 @@ import sys
 #returns true if concave up
 def determine_concavity(p1, p2, last_slope):
     dist = ((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)**.5
-    alt_change = p2[2] - p1[alt]
+    alt_change = p2[2] - p1[2]
     slope = alt_change / dist
 
     return slope - last_slope > 0, slope
 
-def concavity_smooth(path):
+def bleh(path):
     concave_up = []
     concave_down = []
 
@@ -37,7 +38,7 @@ def concavity_smooth(path):
     p2 = path[1]
 
     dist = ((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)**.5
-    alt_change = p2[2] - p1[alt]
+    alt_change = p2[2] - p1[2]
 
     last_slope = alt_change / dist 
 
@@ -45,20 +46,34 @@ def concavity_smooth(path):
 
     start = p1
 
-    max_height = p1[2]
+    max_height = max(p1[2], p2[2])
+
+    max_point = p1 if max_height == p1[2] else p2
   
     new_points = []
     for point in path[2:]:
         new_concavity, last_slope = determine_concavity(last_point, point, last_slope)
 
-        if new_concavity != concavity and concavity != None:
-            #perform transformation
-            pass
+        if new_concavity != concave_up_run and concavity != None:
+            #if concave_up_run:
+            #    pass
+            #else:
+            start_x, start_y, start_z = start
+            max_x, max_y, max_z = max_point
+            max_x, max_y, max_z = max_point
+            new_points.append(start)
+            new_points.append((start_x, start_y, max_z))
+            new_points.append((max_x, maxy, max_z))
+            new_points.append((last_point[0], last_point[1], max_z))
+            new_points.append(last_point)
 
+            max_height = point[2]
+            start = point
         else:
-            max_height = max(p1[2]
+            max_height = max(point[2], max_height)
         
         concavity = new_concavity
+        last_point = point
 
     return new_points
         
@@ -376,7 +391,7 @@ def plan_path(path, strtree, alt_dict, be_buffer, obs_buffer, min_alt_change, cl
         new_obs.append((line.coords[0][0], line.coords[0][1], super_int_dict[line.wkt]))
         new_obs.append((line.coords[1][0], line.coords[1][1], super_int_dict[line.wkt]))
     #print(new_path)
-    return new_path, new_obs
+    return concavity_smooth(new_path), new_obs
 
 def vec_sub(first, second):
     dx = first[0] - second[0]
