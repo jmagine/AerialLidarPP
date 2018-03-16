@@ -19,6 +19,53 @@ import time
 
 import sys
 
+#returns true if concave up
+def determine_concavity(p1, p2, last_slope):
+    dist = ((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)**.5
+    alt_change = p2[2] - p1[alt]
+    slope = alt_change / dist
+
+    return slope - last_slope > 0, slope
+
+def concavity_smooth(path):
+    concave_up = []
+    concave_down = []
+
+    concave_up_run = None
+
+    p1 = path[0]
+    p2 = path[1]
+
+    dist = ((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)**.5
+    alt_change = p2[2] - p1[alt]
+
+    last_slope = alt_change / dist 
+
+    last_point = p2
+
+    start = p1
+
+    max_height = p1[2]
+  
+    new_points = []
+    for point in path[2:]:
+        new_concavity, last_slope = determine_concavity(last_point, point, last_slope)
+
+        if new_concavity != concavity and concavity != None:
+            #perform transformation
+            pass
+
+        else:
+            max_height = max(p1[2]
+        
+        concavity = new_concavity
+
+    return new_points
+        
+        
+        
+        
+
 def get_intersection_map(strtree, alt_dict, segment, buf):
     print(segment)
     ls = LineString(segment)
@@ -242,6 +289,30 @@ def resolve_two_dicts(canopies, lines, canopy_dict, int_dict):
 
     return new_segs, new_dict
 
+def account_for_speed(path, horiz_speed, descent_rate, climb_rate):
+    new_path = []
+    last = path[0]
+
+    for p in path[1:]:
+        last_alt = last[2]
+        alt = p[2]
+
+        dist = ((p[0]-last[0])**2 + (p[1] - last[1])**2)**.5
+
+        #climb
+        if last_alt < alt:
+            time = abs(last_alt - alt) / climb_rate
+            horiz_dist = time * horiz_speed
+            if horiz_dist < dist:
+                pass   
+        #descent
+        else:
+            time = abs(last_alt - alt) / descent_rate
+            horiz_dist = time * horiz_speed
+
+        
+
+
 # Args:
 #   path: (latitude, longitude) tuples
 #   strtree: STRtree containing the topology of the area to explore
@@ -290,14 +361,13 @@ def plan_path(path, strtree, alt_dict, be_buffer, obs_buffer, min_alt_change, cl
 
         #lines, smooth_dict = adjust_speed(lines, smooth_dict, min_speed, max_speed, climb_rate, descent_rate)
 
-        line = lines[0]
-        x,y,z = line.coords[-1]
-        z = smooth_dict[line.wkt]
-        points = [(x,y,z)]
+        points = []
         for line in lines:
-            x,y,z = line.coords[-1]
             z = smooth_dict[line.wkt]
-            points.append((x, y, z))
+            x2,y2,_ = line.coords[-1]
+            x1,y1,_ = line.coords[0]
+            points.append((x1, y1, z))
+            points.append((x2, y2, z))
 
         new_path.extend(points)
 
