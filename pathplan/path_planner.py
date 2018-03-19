@@ -391,7 +391,7 @@ def plan_path(path, strtree, alt_dict, be_buffer, obs_buffer, min_alt_change, cl
         new_obs.append((line.coords[0][0], line.coords[0][1], super_int_dict[line.wkt]))
         new_obs.append((line.coords[1][0], line.coords[1][1], super_int_dict[line.wkt]))
     #print(new_path)
-    return concavity_smooth(new_path), new_obs
+    return new_path, new_obs
 
 def vec_sub(first, second):
     dx = first[0] - second[0]

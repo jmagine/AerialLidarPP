@@ -171,6 +171,13 @@ def area_between_curves(first, second, max_dist=None):
     
     
 
+def linear_interpolation(xs, ys):
+    y_interp = interp1d(xs, ys)
+
+    new_xs = np.arange(xs[0], xs[-1], abs(xs[0]-xs[-1]) / 1000)
+    fake_ys = [y_interp(x) for x in new_xs]
+
+    return new_xs, fake_ys
 def mse(expected, actual):
     """
     Mean squared error of expected and actual waypoints.
@@ -180,15 +187,32 @@ def mse(expected, actual):
     Returns:
         The mean squared error
     """
-    expected = to_np_array(generator_to_list(expected))
-    actual = to_np_array(generator_to_list(gen_path_via_nearest_points(expected, actual)))
 
-    return ((expected - actual)**2).mean(axis=0) # avg along columns
+    fx, fy = build_distance_lists(expected)
+    sx, sy = build_distance_lists(actual)
+
+    exp_interp = np.array(linear_interpolation(fx,fy))
+    act_interp = np.array(linear_interpolation(sx,sy))
+
+    return ((exp_interp - act_interp)**2).mean(axis=0) # avg along columns
 
 def calc_errors_with_gen_noise(filepath, metric=mse):
     waypoints = list(read_path_from_json(filepath))
     noise_pts = list(gen_noise_points(waypoints))
     return metric(expected=waypoints, actual=noise_pts)
+
+def get_individual_stats(name, path):
+    return "len({0}) = {1}\n{0} total distance: {2}".format(name, len(path), total_dist(np.array(path)))
+
+def get_comparison_stats(p1, p2, name1, name2, metrics=[("Area", area_between_curves), ("MSE", mse)]):
+    vals = []
+    for name, metric in metrics:
+        val = metric(p1, p2)
+        vals.append('{0} between {1} and {2} = {3}'.format(name, name1, name2,val))
+
+    return '\n'.join(vals)
+          
+        
 
 def print_comparison_info(planned, flown, name1="planned", name2="flown", metrics=[("Area", area_between_curves)]):
     planned = list(map(to_np_array, planned))
@@ -218,44 +242,6 @@ def display_gen_noise_path_with_file(filepath):
     noise_pts = list(gen_noise_points(waypoints))
     display_two_paths(waypoints, noise_pts)
 
-def display_surface(path_one, path_two):
-    """
-    Display a graph of the a surface between two paths. Expects the two
-    input paths to have the same amount of data points. (ie len(one) == len(two))
-    Args:
-        path_one - List of waypoints in format [(x, y, z), (x, y, z), ...]
-        path_two - List of waypoints in format [(x, y, z), (x, y, z), ...]
-    """
-
-    import matplotlib
-    Z1 = 8.0
-    Z2 = 9.0
-
-    x1, y1, z1 = np.array(path_one).T
-    x2, y2, z2 = np.array(path_two).T
-
-    i, h = np.meshgrid(np.arange(len(x1)), np.linspace(Z1, Z2, 10))
-    X = (x2[i] - x1[i]) / (Z2 - Z1) * (h - Z1) + x1[i]
-    Y = (y2[i] - y1[i]) / (Z2 - Z1) * (h - Z1) + y1[i]
-    Z = (z2[i] - z1[i]) / (Z2 - Z1) * (h - Z1) + z1[i]
-
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    ax.set_xlabel("Distance along path (ft)")
-    ax.set_ylabel("Distance along path (ft)")
-    ax.set_zlabel("Altitude")
-    ax.plot(x1, y1, z1, 'k-', linewidth=1.4, color='b', label="Planned Path")
-    ax.plot(x2, y2, z2, 'k-', linewidth=1.4, color='r', label="Flown Path")
-    ax.plot_surface(X, Y, Z, color='g', alpha=0.4, linewidth=0, label="Highlighted Error")
-
-    # Proxy for displaying legend, as legends are not supported in 3d Plots:
-    colors = ["blue", "red", "green"]
-    proxy1 = matplotlib.lines.Line2D([0],[0], c=colors[0])
-    proxy2 = matplotlib.lines.Line2D([0],[0], c=colors[1])
-    proxy3 = matplotlib.lines.Line2D([0],[0], c=colors[2])
-    ax.legend([proxy1, proxy2, proxy3], ['Planned Path', 'Flown Path', 'Highlighted Error'], numpoints = 1)
-
-    plt.show()
 
 def display_surface_with_file(filepath):
     """ 

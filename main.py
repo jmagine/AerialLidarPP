@@ -18,7 +18,7 @@ from pathplan.evaluation import calculate_intersections, mse, print_comparison_i
 def load_test_case(case_file):
     test_dict = json.load(open(case_file))
     path, pro = read_init_path(test_dict['path'])
-    tif = read_tif(test_dict['tif'])
+    tif, tif_proj = read_tif(test_dict['tif'])
     if "shapes" not in test_dict:
         test_dict['shapes'] = "gen/shapes/{0}.shapes".format(splitext(case_file)[0])
         test_dict['alts'] = "gen/shapes/{0}.alt.json".format(splitext(case_file)[0])
@@ -37,10 +37,9 @@ def load_test_case(case_file):
         shapes = load_shapefile(test_dict['shapes'])
         alt = load_altfile(test_dict['alts'])
 
-    return path, alt, shapes, tif, pro, test_dict
+    return path, alt, shapes, tif, pro, tif_proj, test_dict
 
-def generate_path(case_file, path_name, params_file): 
-    path, alt, shapes, tif, pro, test_case = load_test_case(case_file)
+def gen_path(path, alt, shapes, tif, proj, tif_proj, test_case, path_name, params_file, case_file):
     params = json.load(open(params_file))
     tree = STRtree(shapes)
 
@@ -54,13 +53,17 @@ def generate_path(case_file, path_name, params_file):
     test_case['lines'] = lines_file
 
     path_loc = 'tests/gen-paths/{0}.json'.format(path_name)
-    save_path(path_loc, gen_path,  pro)
+    save_path(path_loc, gen_path,  proj)
     test_case['results'][path_name] = {}
     test_case['results'][path_name]['gen-path'] = path_loc
     test_case['results'][path_name]['params'] = params_file
     save_test_case(case_file,test_case)
 
     return gen_path
+
+def generate_path(case_file, path_name, params_file): 
+    path, alt, shapes, tif, pro, tif_proj, test_case = load_test_case(case_file)
+    return gen_path(path, alt, shapes, tif, pro, tif_proj, test_case, path_name, params_file, case_file)
 
 def save_test_case(case_name, test_dict):
     print(case_name, "case name")
@@ -70,20 +73,23 @@ def save_test_case(case_name, test_dict):
 import os
 
 def generate_flight(case_name, path_name, port, logdir):
-    path, alt, shapes, tif,proj, test_dict = load_test_case(case_name)
+    path, alt, shapes, tif,proj, tif_proj, test_dict = load_test_case(case_name)
+    print(path_name)
     if path_name not in test_dict['results']:
         print("Could not find the named path")
         return
     
     os.chdir(os.path.expanduser('~/CSE145/AerialLidarPP'))
-    subprocess.call(["make", "killsitl"])
-    subprocess.call(["make", "runsitl"])
+    #subprocess.call(["make", "killsitl"])
+    #subprocess.call(["make", "runsitl"])
     bin_path = sitl.fly(port, test_dict['results'][path_name]['gen-path'], "tests/flights/{0}".format(case_name))
     flown_path = sitl.parse_bins(bin_path)
     flight_loc = "tests/flights/{0}.json".format(case_name)
     json.dump(flown_path, open(flight_loc, "w")), 
     test_dict['results'][path_name]['flight_path'] = flight_loc
     save_test_case(case_name,test_dict)
+
+    return flown_path
     
     
 

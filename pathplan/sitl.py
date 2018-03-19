@@ -90,7 +90,7 @@ def get_command_list(mission, tif):
     home_pos_alt = data[row][col] * .3048
 
     nav_type = mavutil.mavlink.MAV_CMD_NAV_WAYPOINT
-    cmd = Command(0, 0, 0, mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT, nav_type, 0, 0, 0, 0, 0, 0, lat, lon, home_pos_alt)
+    cmd = Command(0, 0, 0, mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT, nav_type, 0, 0, 0, 0, 0, 0, lat, lon, 20)
 
     cmds = [cmd]
 
@@ -122,7 +122,9 @@ def fly(port, missionfile, logdir):
     connection_string = "tcp:127.0.0.1:{0}".format(port)
     print(connection_string)
     
+    print("connecting")
     vehicle = connect(connection_string, wait_ready=True)
+    print("finished connecting")
     
     vehicle.parameters['ARMING_CHECK'] = 0
     
