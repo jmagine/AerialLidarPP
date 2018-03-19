@@ -3,7 +3,6 @@ This file contains all methods for converting between different geoographical
 projections and dealing with tif, shape, and altitude json files
 '''
 
-
 from rasterio.features import shapes
 import rasterio
 from shapely.ops import transform
@@ -11,7 +10,6 @@ from shapely.geometry import shape, LineString, Polygon, MultiPolygon
 from shapely.strtree import STRtree
 from shapely.wkb import dumps, loads
 from affine import Affine
-from PIL import Image
 import pyproj
 import numpy as np
 import json
@@ -21,14 +19,16 @@ import math
 
 wgs84 = pyproj.Proj(init="epsg:4326")
 
+
 def get_image_coord(raster, x, y):
-  box = raster.bounds()
-  width = box.right - box.left
-  height = box.top -box.bottom
-  x_perc = x / width
-  y_perc = y / height
-  
-  return x_perc * raster.width, y_perc * raster.height
+    box = raster.bounds()
+    width = box.right - box.left
+    height = box.top - box.bottom
+    x_perc = x / width
+    y_perc = y / height
+
+    return x_perc * raster.width, y_perc * raster.height
+
 
 def utm_zone(lat, lon):
     """Determine the UTM zone for a given latitude and longitude.
@@ -61,29 +61,32 @@ def utm_zone(lat, lon):
 
     return zone, lat > 0
 
+
 def load_shapefile(filename):
     with open(filename, "rb") as wkb_file:
         shapes = list(loads(wkb_file.read()))
     return shapes
+
 
 def load_altfile(filename):
     with open(filename) as alt_dict_file:
         alt_dict = json.load(alt_dict_file)
     return alt_dict
 
-def read_tif(filename):
-  #image = Image.open(filename)
-  #image = np.array(image)
-  #image = plt.imread(filename)
-  #i_w = image.shape[0]
-  #i_h = image.shape[1]
-  #image = image.flatten().reshape((i_w, i_h))
-  print(filename)
-  raster = rasterio.open(filename)
 
-  print(raster.crs)
-  
-  return raster.read(), pyproj.Proj(raster.crs, preserve_units=True)
+def read_tif(filename):
+    #image = Image.open(filename)
+    #image = np.array(image)
+    #image = plt.imread(filename)
+    #i_w = image.shape[0]
+    #i_h = image.shape[1]
+    #image = image.flatten().reshape((i_w, i_h))
+    print(filename)
+    raster = rasterio.open(filename)
+
+    print(raster.crs)
+
+    return raster.read(), pyproj.Proj(raster.crs, preserve_units=True)
 
 
 def proj_utm(zone, north):
@@ -116,17 +119,21 @@ Converts a raster file into a vector representation
 e.g. goes from the pixelized raster to a series of shapes
 mapped to altitude
 '''
+
+
 def vectorize_raster(rasterfile):
 
     results = None
 
     with rasterio.drivers():
         with rasterio.open(rasterfile) as src:
-            image = src.read(1) # first band
-            results = (
-            {'properties': {'raster_val': v}, 'geometry': s}
-            for i, (s, v) 
-            in enumerate(
+            image = src.read(1)  # first band
+            results = ({
+                'properties': {
+                    'raster_val': v
+                },
+                'geometry': s
+            } for i, (s, v) in enumerate(
                 shapes(image, mask=None, transform=src.affine)))
 
     return list(results)
@@ -151,7 +158,6 @@ def shapelify_vector(vectors, do_transform=True, crs=None, proj=None):
     def transform_to_proj(x, y, z=None):
         return pyproj.transform(crs, proj, x, y, z)
 
-
     init_time = time.time()
     for vec in vectors:
         shap = shape(vec['geometry'])
@@ -160,6 +166,7 @@ def shapelify_vector(vectors, do_transform=True, crs=None, proj=None):
         alt_dict[shap.wkt] = vec['properties']['raster_val']
         shapes.append(shap)
 
-    print("transforming the vectors took {0} seconds".format(time.time() - init_time))
+    print("transforming the vectors took {0} seconds".format(
+        time.time() - init_time))
 
     return shapes, alt_dict
