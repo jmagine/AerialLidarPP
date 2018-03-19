@@ -14,7 +14,6 @@ from pathplan.utils import save_path
 
 import json
 import numpy as np
-from PIL import Image
 from math import hypot
 
 '''[Config vars]------------------------------------------------------------'''

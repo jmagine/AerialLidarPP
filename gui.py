@@ -17,12 +17,9 @@ from pathplan.evaluation import get_comparison_stats, get_individual_stats
 from main import generate_path, create_test_case, load_test_case, generate_flight
 import json
 
-from matplotlib.colors import get_named_colors_mapping, to_rgb
 import random
 
-colors = list(get_named_colors_mapping().items())
-
-print(get_named_colors_mapping().items())
+colors = ['r', 'b', 'y']
 
 class Gui(QWidget):
 
