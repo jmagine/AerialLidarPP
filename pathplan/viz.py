@@ -6,7 +6,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
 from pathplan.utils import distance, read_init_path
 from pathplan.geo import wgs84
-from scipy.interpolate import interp1d
+from scipy.interpolate import interp1d,griddata
 import numpy as np
 import pyproj
 
@@ -25,6 +25,11 @@ def build_distance_lists(tups):
 
     return xs, ys
 
+def reduce_points(less, gt):
+    tup_set = set([(x,y) for (x,y,z) in less])
+ 
+    return [(x,y,z) for (x,y,z) in gt if (x,y) in tup_set]
+
 def display_surface(path_one, path_two, ax):
     """
     Display a graph of the a surface between two paths. Expects the two
@@ -33,6 +38,11 @@ def display_surface(path_one, path_two, ax):
         path_one - List of waypoints in format [(x, y, z), (x, y, z), ...]
         path_two - List of waypoints in format [(x, y, z), (x, y, z), ...]
     """
+
+    if len(path_one) > len(path_two):
+        path_one = reduce_points(path_two, path_one)
+    else:
+        path_two = reduce_points(path_one, path_two)
 
     Z1 = 8.0
     Z2 = 9.0
@@ -48,8 +58,8 @@ def display_surface(path_one, path_two, ax):
     ax.set_xlabel("Distance along path (ft)")
     ax.set_ylabel("Distance along path (ft)")
     ax.set_zlabel("Altitude")
-    ax.plot(x1, y1, z1, 'k-', linewidth=1.4, color='b', label="Planned Path")
-    ax.plot(x2, y2, z2, 'k-', linewidth=1.4, color='r', label="Flown Path")
+    #ax.plot(x1, y1, z1, 'k-', linewidth=1.4, color='b', label="Planned Path")
+    #ax.plot(x2, y2, z2, 'k-', linewidth=1.4, color='r', label="Flown Path")
     ax.plot_surface(X, Y, Z, color='g', alpha=0.4, linewidth=0, label="Highlighted Error")
 
     # Proxy for displaying legend, as legends are not supported in 3d Plots:
@@ -57,7 +67,7 @@ def display_surface(path_one, path_two, ax):
     proxy1 = matplotlib.lines.Line2D([0],[0], c=colors[0])
     proxy2 = matplotlib.lines.Line2D([0],[0], c=colors[1])
     proxy3 = matplotlib.lines.Line2D([0],[0], c=colors[2])
-    ax.legend([proxy1, proxy2, proxy3], ['Path1', 'Path2', 'Highlighted Error'], numpoints = 1)
+    #ax.legend([proxy1, proxy2, proxy3], ['Path1', 'Path2', 'Highlighted Error'], numpoints = 1)
 
 def plot_lidar_penetration(path, dist, **kwargs):
   if 'ax' not in kwargs:

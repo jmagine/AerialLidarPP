@@ -194,7 +194,7 @@ def mse(expected, actual):
     exp_interp = np.array(linear_interpolation(fx,fy))
     act_interp = np.array(linear_interpolation(sx,sy))
 
-    return ((exp_interp - act_interp)**2).mean(axis=0) # avg along columns
+    return ((exp_interp - act_interp)**2).sum(axis=1) # avg along columns
 
 def calc_errors_with_gen_noise(filepath, metric=mse):
     waypoints = list(read_path_from_json(filepath))
@@ -204,7 +204,7 @@ def calc_errors_with_gen_noise(filepath, metric=mse):
 def get_individual_stats(name, path):
     return "len({0}) = {1}\n{0} total distance: {2}".format(name, len(path), total_dist(np.array(path)))
 
-def get_comparison_stats(p1, p2, name1, name2, metrics=[("Area", area_between_curves), ("MSE", mse)]):
+def get_comparison_stats(p1, p2, name1, name2, metrics=[("Area", area_between_curves), ("SSE", mse)]):
     vals = []
     for name, metric in metrics:
         val = metric(p1, p2)

@@ -1,11 +1,8 @@
-language: python2
-
-sudo: true
-
-install:
-- sudo python -m pip install -r requirements.txt
+sudo: required
+services: 
+   - docker
 
 script:
-    - ~/.dronekit/sitl/copter-3.3/apm --home=-35.363261,149.165230,584,353 --model=quad &
-    - python sitl/sitl.py 5760 sitl/test_mission.json
+   - docker build . -t otoojaursk/aerial-lidar:latest
+   - docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD"
 

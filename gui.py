@@ -20,9 +20,8 @@ import json
 from matplotlib.colors import get_named_colors_mapping, to_rgb
 import random
 
-colors = list(get_named_colors_mapping().items())
+colors = ['r', 'b', 'y']
 
-print(get_named_colors_mapping().items())
 
 class Gui(QWidget):
 
@@ -46,7 +45,6 @@ class Gui(QWidget):
         self.surface = None
         self.load_lines()
         self.surface_checked = False
-        self.load_paths()
         self.init_ui()
         print(self.paths, "self.paths")
         print(self.current_paths, "self.current_paths")
@@ -57,7 +55,8 @@ class Gui(QWidget):
 
     def load_paths(self):
         for path in self.tc['results']:
-            self.paths[path], _ = read_init_path(self.tc['results'][path]['gen-path'])
+            print(path)
+            self.paths[path],_  = read_init_path(self.tc['results'][path]['gen-path'])
             self.params[path] = json.load(open(self.tc['results'][path]['params']))
 
             if 'flight_path' in self.tc['results'][path]:
@@ -95,9 +94,9 @@ class Gui(QWidget):
         plot_colors = []
 
         for item in selected_items:
-            colo = QColor(colors[color_idx][1])
-            item.setForeground(colo)
-            plot_colors.append(colors[color_idx][0])
+            #colo = QColor(colors[color_idx][1])
+            #item.setForeground(colo)
+            plot_colors.append(colors[color_idx])
             text = str(item.text())
             self.current_paths.append((text, self.paths[text]))
             color_idx += 1
@@ -215,10 +214,11 @@ class Gui(QWidget):
 
         self.raster = rasterio.open(self.tc['tif'])
 
-        if 'initial' not in self.tc:
-            self.paths['initial'] = generate_path(fname, 'test path', self.default_params)
+        self.load_paths()
+        if 'init' not in self.tc:
+            self.paths['init'] = generate_path(fname, 'init', self.default_params)
             self.test_case = fname
-            self.params['initial'] = self.default_params
+            self.params['init'] = self.default_params
 
         self.current_paths = [val for val in self.paths.items()]
           
@@ -267,7 +267,7 @@ class Gui(QWidget):
         self.params[path_name] = parms
         self.path_list.addItem(path_name)
         last_item = self.path_list.item(len(self.path_list)-1)
-        self.path_list.setCurrentItem(last_item, True)
+        self.path_list.setCurrentItem(last_item)
 
         self.change_selected_paths()
         

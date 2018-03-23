@@ -72,7 +72,7 @@ def save_test_case(case_name, test_dict):
 
 import os
 
-def generate_flight(case_name, path_name, port, logdir):
+def generate_flight(case_name, path_name, port):
     path, alt, shapes, tif,proj, tif_proj, test_dict = load_test_case(case_name)
     print(path_name)
     if path_name not in test_dict['results']:
@@ -80,8 +80,8 @@ def generate_flight(case_name, path_name, port, logdir):
         return
     
     os.chdir(os.path.expanduser('~/CSE145/AerialLidarPP'))
-    #subprocess.call(["make", "killsitl"])
-    #subprocess.call(["make", "runsitl"])
+    subprocess.call(["make", "killsitl"])
+    subprocess.call(["make", "runsitl"])
     bin_path = sitl.fly(port, test_dict['results'][path_name]['gen-path'], "tests/flights/{0}".format(case_name))
     flown_path = sitl.parse_bins(bin_path)
     flight_loc = "tests/flights/{0}.json".format(case_name)
@@ -168,99 +168,102 @@ def print_commands():
 
 
 if __name__ == '__main__':
-    print("Welcome to the interactive testing/evaluation setup for the Aerial Lidar project")
-    print("TODO: Add commands to generate tifs")
-    print_commands()
- 
-    params = {}
-
-    try:
-        while True:
-            try:
-                command = input("Enter Command: ").split(" ")
-                if command[0] == 'create':
-                    if len(command) == 6:
-                        create_test_case(*command[1:])
-                    else:
-                        print("Error incorrect # of args")
-                        print_commands()
-                    continue
-                elif command[0] == 'gen':
-                    if len(command) == 4:
-                        generate_path(*(command[1:]))
-                    else:
-                        print("Error incorrect # of args")
-                        print_commands()
-                    continue
-                elif command[0] == 'fly':
-                    if len(command) == 4:
-                        generate_flight(*(command[1:] + ["logs"]))
-                    else:
-                        print("Error incorrect # of args")
-                        print_commands()
-                    continue
-                elif command[0] == 'plot-2d':
-                    if len(command) > 2:
-                        plot_2d_one(*command[1:])
-                    else:
-                        print("Error incorrect # of args")
-                        print_commands()
-                    continue
-                elif command[0] == 'plot-all-2d':
-                    if len(command) == 2:
-                        plot_2d_all(command[1])
-                    else:
-                        print("Error incorrect # of args")
-                        print_commands()
-                    continue
-                elif command[0] == 'plot-3d':
-                    if len(command) > 2:
-                        plot_3d_one(*command[1:])
-                    else:
-                        print("Error incorrect # of args")
-                        print_commands()
-                    continue
-                elif command[0] == 'plot-all-3d':
-                    if len(command) == 2:
-                        _,_,_,_,_,test_dict = load_test_case(command[1])
-                        plot_3d_one(command[1], *test_dict['results'])
-                    else:
-                        print("Error incorrect # of args")
-                        print_commands()
-                    continue
-                elif command[0] == 'compare-paths':
-                    if len(command) > 4:
-                        print("Error incorrect # of args") 
-                        print_commands()
-                    else:
-                        compare_to_base(*command[1:])
-                elif command[0] == 'compare-to-flight':
-                    if len(command) == 4:
-                        print("Error incorrect # of args") 
-                        print_commands()
-                    else:
-                        compare_to_flight(*command[1:])
-                elif command[0] == 'new-params':
-                    if len(command) != 2:
-                        print("Incorrect number of args")
-                        print_commands()
-                    else:
-                        params = {}
-                        params['be_buffer'] = float(input("Enter distance from bare earth: "))
-                        params['obs_buffer'] = float(input("Enter distance from surfaces: ")) 
-                        params['min_length'] = float(input("Enter min alt change: "))
-                        params['climb_rate'] = float(input("Enter climb_rate: ")) 
-                        params['descent_rate'] = float(input("Enter descent rate: "))
-                        params['max_speed'] = float(input("Enter maximum horizontal speed: "))
-                        json.dump(params, open('tests/params/{0}.json'.format(command[1]), 'w'))
-                elif command[0] == 'help':
-                    print_commands()
-            except KeyboardInterrupt:
-                raise KeyboardInterrupt
-            except Exception as e:
-                print("There was a problem, please try again")
-                traceback.print_exc()
-    except KeyboardInterrupt:
-        print("Closing the Aerial Lidar interactive prompt") 
+     import sys
+     generate_flight(sys.argv[1], sys.argv[2], 5760)
+     
+#    print("Welcome to the interactive testing/evaluation setup for the Aerial Lidar project")
+#    print("TODO: Add commands to generate tifs")
+#    print_commands()
+# 
+#    params = {}
+#
+#    try:
+#        while True:
+#            try:
+#                command = input("Enter Command: ").split(" ")
+#                if command[0] == 'create':
+#                    if len(command) == 6:
+#                        create_test_case(*command[1:])
+#                    else:
+#                        print("Error incorrect # of args")
+#                        print_commands()
+#                    continue
+#                elif command[0] == 'gen':
+#                    if len(command) == 4:
+#                        generate_path(*(command[1:]))
+#                    else:
+#                        print("Error incorrect # of args")
+#                        print_commands()
+#                    continue
+#                elif command[0] == 'fly':
+#                    if len(command) == 4:
+#                        generate_flight(*(command[1:] + ["logs"]))
+#                    else:
+#                        print("Error incorrect # of args")
+#                        print_commands()
+#                    continue
+#                elif command[0] == 'plot-2d':
+#                    if len(command) > 2:
+#                        plot_2d_one(*command[1:])
+#                    else:
+#                        print("Error incorrect # of args")
+#                        print_commands()
+#                    continue
+#                elif command[0] == 'plot-all-2d':
+#                    if len(command) == 2:
+#                        plot_2d_all(command[1])
+#                    else:
+#                        print("Error incorrect # of args")
+#                        print_commands()
+#                    continue
+#                elif command[0] == 'plot-3d':
+#                    if len(command) > 2:
+#                        plot_3d_one(*command[1:])
+#                    else:
+#                        print("Error incorrect # of args")
+#                        print_commands()
+#                    continue
+#                elif command[0] == 'plot-all-3d':
+#                    if len(command) == 2:
+#                        _,_,_,_,_,test_dict = load_test_case(command[1])
+#                        plot_3d_one(command[1], *test_dict['results'])
+#                    else:
+#                        print("Error incorrect # of args")
+#                        print_commands()
+#                    continue
+#                elif command[0] == 'compare-paths':
+#                    if len(command) > 4:
+#                        print("Error incorrect # of args") 
+#                        print_commands()
+#                    else:
+#                        compare_to_base(*command[1:])
+#                elif command[0] == 'compare-to-flight':
+#                    if len(command) == 4:
+#                        print("Error incorrect # of args") 
+#                        print_commands()
+#                    else:
+#                        compare_to_flight(*command[1:])
+#                elif command[0] == 'new-params':
+#                    if len(command) != 2:
+#                        print("Incorrect number of args")
+#                        print_commands()
+#                    else:
+#                        params = {}
+#                        params['be_buffer'] = float(input("Enter distance from bare earth: "))
+#                        params['obs_buffer'] = float(input("Enter distance from surfaces: ")) 
+#                        params['min_length'] = float(input("Enter min alt change: "))
+#                        params['climb_rate'] = float(input("Enter climb_rate: ")) 
+#                        params['descent_rate'] = float(input("Enter descent rate: "))
+#                        params['max_speed'] = float(input("Enter maximum horizontal speed: "))
+#                        json.dump(params, open('tests/params/{0}.json'.format(command[1]), 'w'))
+#                elif command[0] == 'help':
+#                    print_commands()
+#            except KeyboardInterrupt:
+#                raise KeyboardInterrupt
+#            except Exception as e:
+#                print("There was a problem, please try again")
+#                traceback.print_exc()
+#    except KeyboardInterrupt:
+#        print("Closing the Aerial Lidar interactive prompt") 
 
 
