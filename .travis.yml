@@ -3,6 +3,7 @@ services:
    - docker
 
 script:
-   - docker build . -t otoojaursk/aerial-lidar:latest
    - docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD"
+   - docker build . -t otoojaursk/aerial-lidar:latest
+   - docker push otoojaursk/aerial-lidar:latest
 
