@@ -1,0 +1,11 @@
+affine==2.1.0
+dronekit==2.9.1
+dronekit-sitl==3.2.0
+matplotlib==1.5.1
+numpy==1.14.0
+pymavlink==2.0.6
+pyparsing==2.2.0
+pyproj==1.9.5.1
+scipy==0.17.0
+PyQt5==5.10.1
+Shapely==1.6.4.post1
